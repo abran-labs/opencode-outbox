@@ -10,6 +10,7 @@ try {
   const sessionID="ses_smoke";
   await page.exposeFunction("fetchDraft",args=>store.get(args));
   await page.exposeFunction("changeDraft",args=>store.change(args));
+  await page.exposeFunction("uploadMedia",args=>store.upload(args));
   await page.exposeFunction("setRule",args=>store.rule(args));
   await page.setContent("<main></main>");
   await page.evaluate(()=>{
@@ -27,7 +28,7 @@ try {
     await page.evaluate(({id,sessionID})=>{
       window.clean?.();
       window.placement=code=>window.render({code,session:{
-        id:sessionID,key:sessionID,directory:"/",server:{client:{session:{generate:req=>new Promise((resolve,reject)=>{window.rewriteRequest=req;window.finishRewrite=text=>resolve({text});window.failRewrite=()=>reject(Error("Model unavailable"));})},rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule,events:{on:(_,fn)=>{window.onRevision=fn;return ()=>{delete window.onRevision;};}}})}}
+        id:sessionID,key:sessionID,directory:"/",server:{client:{session:{generate:req=>new Promise((resolve,reject)=>{window.rewriteRequest=req;window.finishRewrite=text=>resolve({text});window.failRewrite=()=>reject(Error("Model unavailable"));})},rpc:()=>({get:window.fetchDraft,change:window.changeDraft,upload:window.uploadMedia,rule:window.setRule,events:{on:(_,fn)=>{window.onRevision=fn;return ()=>{delete window.onRevision;};}}})}}
       }});
       document.querySelector("main").replaceChildren(window.placement(id));
     },row);
@@ -163,5 +164,22 @@ try {
   await send.click();
   await page.getByRole("button",{name:"Sending",exact:true}).waitFor();
   assert.equal(JSON.parse(notices.at(-1).text.split("\n").at(-1)).body,slackText+" Thanks!");
-  console.log("Chromium: edited copy, discard receipt and edited send handoff passed.");
+  await mount({service:"Mail",to:"demo@example.test",body:"Pictures",delivery:"fixture.send",media_limit:{source:"Fixture connector",max_files:2}});
+  const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNrkAAAAASUVORK5CYII=","base64");
+  await page.locator("input[type=file]").setInputFiles({name:"picked.png",mimeType:"image/png",buffer:png});
+  await page.getByRole("button",{name:"Remove picked.png"}).waitFor();
+  for(const [type,name] of [["drop","drop.png"],["paste","paste.png"]]){
+    await page.evaluate(({type,name,bytes})=>{
+      const dt=new DataTransfer();dt.items.add(new File([new Uint8Array(bytes)],name,{type:"image/png"}));
+      document.querySelector("textarea").dispatchEvent(type==="drop"?new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt}):new ClipboardEvent(type,{bubbles:true,cancelable:true,clipboardData:dt}));
+    },{type,name,bytes:[...png]});
+    await page.getByRole("button",{name:`Remove ${name}`}).waitFor();
+  }
+  assert.equal(await page.locator(".bytes.over").count(),3);assert.ok(await send.isDisabled());
+  await page.getByRole("button",{name:"Remove drop.png"}).click();
+  await page.waitForFunction(()=>document.querySelectorAll(".media-tile").length===2);
+  await page.getByLabel("Message body").fill("");await send.click();await page.getByRole("button",{name:"Sending",exact:true}).waitFor();
+  const media=JSON.parse(notices.at(-1).text.split("\n").at(-1));assert.deepEqual(media.attachments.map(a=>a.name),["picked.png","paste.png"]);
+  await store.report({sessionID,id:notices.at(-1).text.match(/Outbox card ([0-9a-f-]{36})/)[1],outcome:"sent"});
+  console.log("Chromium: card editing, rewrite, Slack mentions, media picker/drop/paste/removal, cap warnings and media-only send handoff passed.");
 } finally {await browser.close();}

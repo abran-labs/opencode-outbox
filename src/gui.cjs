@@ -2,7 +2,7 @@
 const {Plugin, CodeBlock} = require("@opencode/plugin/gui");
 const {onCleanup,getOwner,createSignal} = require("solid-js");
 const {render} = require("solid-js/web");
-const contract = {id:"outbox", methods:{get:{},change:{},rule:{}}, events:{revised:{}}};
+const contract = {id:"outbox", methods:{get:{},change:{},rule:{},upload:{}}, events:{revised:{}}};
 const sheets = `
 .oc-outbox[hidden],[data-component="markdown-code"][data-language="outbox"]:has(.oc-outbox[hidden]){display:none}
 .oc-outbox{border:1px solid var(--border-weak-base,#8885);border-radius:14px;padding:16px;background:var(--surface-base,#242424);color:var(--text-base,inherit);font:inherit;display:grid;gap:10px;min-width:0}
@@ -25,6 +25,14 @@ const sheets = `
 .oc-outbox .editor:hover .editor-actions,.oc-outbox .editor-actions:has(:focus-visible),.oc-outbox .editor-actions:has(.rewrite[data-feedback]){opacity:1;pointer-events:auto}
 @media(hover:none){.oc-outbox .editor-actions{opacity:1;pointer-events:auto}}
 .oc-outbox .editor-actions[hidden]{display:none}
+.oc-outbox .media-grid{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.oc-outbox .media-grid:empty{display:none}
+.oc-outbox .media-item{width:min(144px,100%);min-width:0;margin:0}.oc-outbox .media-tile{height:92px;position:relative;background:var(--wash);border-radius:9px;overflow:hidden;display:grid;place-items:center}
+.oc-outbox .media-tile img{width:100%;height:100%;object-fit:cover}.oc-outbox .media-tile button{position:absolute;right:4px;top:4px;background:#151515d9;color:white;border:0;width:24px;height:24px;line-height:1;padding:0}
+.oc-outbox .bytes,.oc-outbox .duration{position:absolute;bottom:4px;background:#101010df;color:#ddd;border-radius:4px;font:500 11px/1.5 system-ui;padding:0 5px}.oc-outbox .bytes{left:4px}.oc-outbox .duration{right:4px}
+.oc-outbox .bytes.over{color:#ff9a9a}.oc-outbox .media-error{font-size:12px;color:var(--text-danger-base,#df6a64);overflow-wrap:anywhere}
+.oc-outbox figcaption{font-size:12px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:3px}.oc-outbox .attach{margin-inline-end:auto;font-size:13px;white-space:nowrap}
+.oc-outbox .reply-line{font-size:13px;opacity:.85}.oc-outbox .reply-line q{display:block;border-left:2px solid #8887;padding-left:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oc-outbox .reply-line input{width:auto}.oc-outbox.drop-target{outline:2px dashed currentColor}
 .oc-outbox footer{position:relative}.oc-outbox .split{display:inline-flex;border-radius:24px;background:var(--text-strong,#eee);color:var(--background-base,#222);overflow:hidden}
 .oc-outbox .split button{background:transparent;color:inherit;border-radius:0}.oc-outbox button:hover:not(:disabled){background:var(--wash)}
 .oc-outbox .menu{position:absolute;bottom:calc(100% + 5px);right:0;z-index:3;background:var(--surface-base,#242424);border:1px solid #8885;border-radius:10px;padding:4px;box-shadow:0 4px 16px #0003}
@@ -146,6 +154,7 @@ function renderCard(ctx, session, id, position) {
   }
   function draw(){
     if(closed)return;
+    root.ondragover=root.ondragleave=root.ondrop=root.onpaste=null;root.classList.remove("drop-target");
     disposeActions?.();disposeActions=undefined;
     root.replaceChildren(node("style",sheets));
     if(!card){root.append(status);return;}
@@ -175,6 +184,15 @@ function renderCard(ctx, session, id, position) {
     if(mail||card.subject)field("subject","Subject","Subject");
     for(const [k,label,hint] of [["from","From","Default account"],["to","To",mail?"name@example.com":"Recipient"],["cc","Cc","name@example.com"],["bcc","Bcc","name@example.com"]])
       if(card[k]||(mail&&k!=="bcc")||(send&&k==="to"))field(k,label,hint);
+    if(card.reply){
+      if(fields.to)fields.to.readOnly=true;
+      const row=node("div",undefined,"reply-line"),ping=node("input"),label=node("label");
+      row.append("↩ Replying to ",node("b",card.reply.author),node("q",card.reply.excerpt||"Media message"));
+      ping.type="checkbox";ping.checked=card.reply.ping_on_reply;ping.disabled=card.state!=="draft";
+      ping.onchange=()=>commit("edit",{...snapshot(),ping_on_reply:ping.checked}).catch(()=>{ping.checked=card.reply.ping_on_reply;});
+      label.append(ping," Notify author");row.append(label);root.append(row);
+    }
+    if(card.detail&&card.state==="draft")root.append(node("small",card.detail,"media-error"));
     input=node("textarea");input.setAttribute("aria-label","Message body");input.maxLength=100000;input.value=card.body;
     fields.body=input;input.oninput=edited;input.spellcheck=true;
     const editor=node("div",undefined,"editor"),copy=node("button",undefined,"body-copy"),footer=node("footer"), discard=node("button","Discard");
@@ -195,14 +213,16 @@ function renderCard(ctx, session, id, position) {
       preview.onclick=()=>input.focus();
       editor.append(preview);refreshMentions=paint;paint();
     }
-    const rewrite=node("button",undefined,"rewrite"),[rewriteLabel,setRewriteLabel]=createSignal("Rewrite"),[copyLabel,setCopyLabel]=createSignal("Copy");
+    const copyHint=card.attachments?.length?"Copy text":"Copy";
+    const rewrite=node("button",undefined,"rewrite"),[rewriteLabel,setRewriteLabel]=createSignal("Rewrite"),[copyLabel,setCopyLabel]=createSignal(copyHint);
     rewrite.append(icon("rewrite"));rewrite.setAttribute("aria-label","Rewrite");
     copy.append(icon("copy"));
     copy.setAttribute("aria-label","Copy message");
     const split=node("div",undefined,"split"),primary=node("button",send?"Send":"Copy"),arrow=node("button"),menu=node("div",undefined,"menu");
     arrow.append(icon("arrow"));
     arrow.setAttribute("aria-label","Send options");arrow.setAttribute("aria-expanded","false");menu.hidden=true;
-    const enabled=()=>{rewrite.disabled=primary.disabled=busy||!input.value.trim();primary.title=send&&!fields.to?.value.trim()?"Enter a recipient to send":"";};
+    const enabled=()=>{rewrite.disabled=busy||!input.value.trim();primary.disabled=busy||(!input.value.trim()&&!(send&&card.attachments?.length))||(send&&Object.keys(card.media_warnings||{}).length>0);
+      primary.title=Object.values(card.media_warnings||{})[0]||(send&&!fields.to?.value.trim()?"Enter a recipient to send":"");};
     function edited(){
       dirty=true;status.textContent="";enabled();clearTimeout(timer);
       timer=setTimeout(()=>commit("edit",snapshot()).catch(()=>{}),200);
@@ -253,7 +273,7 @@ function renderCard(ctx, session, id, position) {
       try{
         if(action==="copy"){
           await ctx.system.copy(values.body);copy.replaceChildren(icon("check"));copy.setAttribute("aria-label","Copied");setCopyLabel("Copied");
-          clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.setAttribute("aria-label","Copy message");setCopyLabel("Copy");},1600);
+          clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.setAttribute("aria-label","Copy message");setCopyLabel(copyHint);},1600);
           await commit("edit",values);
         } else {await commit(action,values);draw();}
       }catch(e){error(e);}
@@ -296,7 +316,52 @@ function renderCard(ctx, session, id, position) {
     };
     const actions=node("div",undefined,"editor-actions");
     disposeActions=render(()=>[ctx.ui.Tooltip({get value(){return rewriteLabel();},children:rewrite}),ctx.ui.Tooltip({get value(){return copyLabel();},children:copy})],actions,undefined,{owner});
-    editor.append(input,actions);split.append(primary);if(send)split.append(arrow);footer.append(discard,split,menu);root.append(editor,status,footer);
+    const grid=node("div",undefined,"media-grid"),picker=node("input"),attach=node("button","＋ Media","attach");
+    picker.type="file";picker.multiple=true;picker.accept="image/*,video/*";picker.hidden=true;picker.setAttribute("aria-label","Choose images or videos");
+    attach.setAttribute("aria-label","Add images or videos");attach.title="Add images or videos · drop or paste files here";
+    attach.onclick=()=>{if(!busy)picker.click();};
+    async function mediaChange(fn){
+      if(busy||card.state!=="draft")return;
+      busy=true;clearTimeout(timer);root.inert=true;root.setAttribute("aria-busy","true");
+      try{
+        status.textContent="";await commit("edit",snapshot());await fn();
+      }catch(e){error(e);}
+      finally{busy=false;root.inert=false;if(!closed){draw();window.dispatchEvent(new CustomEvent(channel,{detail:card}));}}
+    }
+    async function addFiles(files){
+      if(!files.length)return;
+      await mediaChange(async()=>{
+        for(const file of files){
+          const r={...ref,revision:card.revision};let upload_id;
+          try{
+            status.textContent=`Adding ${file.name}…`;
+            ({upload_id}=await rpc().upload({...r,name:file.name,total:file.size},opt));
+            for(let offset=0;offset<file.size;offset+=192*1024){
+              const buf=new Uint8Array(await file.slice(offset,offset+192*1024).arrayBuffer());let binary="";
+              for(let i=0;i<buf.length;i+=8192)binary+=String.fromCharCode(...buf.subarray(i,i+8192));
+              const result=await rpc().upload({...r,upload_id,offset,data:btoa(binary)},opt);
+              if(result.card){card=result.card;upload_id=undefined;}
+            }
+          }finally{if(upload_id)await rpc().upload({...r,upload_id,cancel:true},opt).catch(()=>{});}
+        }
+        status.textContent="";
+      });
+    }
+    picker.onchange=()=>addFiles([...picker.files]);root.ondragover=e=>{if(card.state==="draft"&&e.dataTransfer.types.includes("Files")){e.preventDefault();root.classList.add("drop-target");}};
+    root.ondragleave=e=>{if(!root.contains(e.relatedTarget))root.classList.remove("drop-target");};
+    root.ondrop=e=>{root.classList.remove("drop-target");if(e.dataTransfer.files.length){e.preventDefault();e.stopPropagation();addFiles([...e.dataTransfer.files]);}};
+    root.onpaste=e=>{if(e.clipboardData.files.length){e.preventDefault();e.stopPropagation();addFiles([...e.clipboardData.files]);}};
+    for(const a of card.attachments||[]){
+      const fig=node("figure",undefined,"media-item"),tile=node("div",undefined,"media-tile");
+      if(a.thumbnail){const img=node("img");img.alt=a.name;img.src=a.thumbnail;tile.append(img);}
+      else tile.append(node("span",a.mime.startsWith("video/")?"Video":"Image"));
+      if(a.duration){const sec=Math.round(a.duration);tile.append(node("span",`${Math.floor(sec/60)}:${String(sec%60).padStart(2,"0")}`,"duration"));}
+      const why=card.media_warnings?.[a.id],size=a.size<1024?`${a.size} B`:a.size<1024**2?`${+(a.size/1024).toFixed(1)} KiB`:`${+(a.size/1024**2).toFixed(1)} MiB`;
+      const badge=node("span",(why?"⚠ ":"")+size,why?"bytes over":"bytes");badge.title=why||`${a.size.toLocaleString()} bytes`;tile.append(badge);
+      if(card.state==="draft"){const remove=node("button","×");remove.setAttribute("aria-label",`Remove ${a.name}`);remove.onclick=()=>mediaChange(async()=>{card=await rpc().change({...ref,revision:card.revision,body:card.body,action:"edit",remove_attachments:[a.id]},opt);});tile.append(remove);}
+      fig.append(tile,node("figcaption",a.name));if(why)fig.append(node("div",why,"media-error"));grid.append(fig);
+    }
+    editor.append(input,actions);split.append(primary);if(send)split.append(arrow);if(card.state==="draft")footer.append(attach,picker);footer.append(discard,split,menu);root.append(editor,grid,status,footer);
     if(card.state==="sending"){
       for(const el of Object.values(fields))el.readOnly=true;
       actions.hidden=true;discard.hidden=true;arrow.hidden=true;

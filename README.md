@@ -17,7 +17,9 @@ Ask your agent to draft a message. Edit the draft directly on its local card. Se
 | Action | What it does |
 | --- | --- |
 | Send | Asks the agent to deliver your exact draft through its usual messaging MCP. (e.g. https://github.com/taylorwilsdon/google_workspace_mcp) |
-| Copy | Copies your exact draft to your clipboard. |
+| ＋ Media | Add images or videos with the file picker, drag-and-drop, or paste. Each thumbnail shows its size; × removes it from the draft. |
+| Rewrite | Rewords the draft in place, keeping its attachments. |
+| Copy | Copies the message text to your clipboard. |
 | Discard | Closes the draft without sending it. |
 
 ## Uninstall
