@@ -116,5 +116,20 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
       return next;
     });
   }
-  return {create,get,change,rule};
+  async function revise(ref) {
+    const card=await get(ref);
+    if(card.state!=="draft")throw Error("This card is closed.");
+    let body=card.body;
+    if(ref.append!==undefined){
+      if(!ref.append||ref.old_text!==undefined||ref.new_text!==undefined)throw Error("Use append or one exact replacement.");
+      body+=ref.append;
+    } else if(ref.old_text!==undefined || ref.new_text!==undefined){
+      const at=body.indexOf(ref.old_text);
+      if(!ref.old_text || typeof ref.new_text!=="string" || at<0 || body.indexOf(ref.old_text,at+1)!==-1)
+        throw Error("Text does not match exactly once in the current draft. Leave the original card in place.");
+      body=body.slice(0,at)+ref.new_text+body.slice(at+ref.old_text.length);
+    } else if(!["subject","from","to","cc","bcc"].some(k=>Object.hasOwn(ref,k)))throw Error("No edit specified.");
+    return change({...ref,action:"edit",revision:card.revision,body});
+  }
+  return {create,get,change,rule,revise};
 }

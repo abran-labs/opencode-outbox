@@ -1,7 +1,7 @@
 // A standalone, hand-authored GUI entry: Git installs need no build or install scripts.
 const {Plugin, CodeBlock} = require("@opencode/plugin/gui");
 const {onCleanup} = require("solid-js");
-const contract = {id:"outbox", methods:{get:{},change:{},rule:{}}, events:{}};
+const contract = {id:"outbox", methods:{get:{},change:{},rule:{}}, events:{revised:{}}};
 const sheets = `
 .oc-outbox{border:1px solid var(--border-weak-base,#8885);border-radius:14px;padding:16px;background:var(--surface-base,#242424);color:var(--text-base,inherit);font:inherit;display:grid;gap:10px;min-width:0}
 .oc-outbox header,.oc-outbox footer{display:flex;align-items:center;gap:8px}.oc-outbox header{font-size:12px;opacity:.8}.oc-outbox strong{font-size:16px}.oc-outbox .field{border-bottom:1px solid #8883;padding-bottom:5px;overflow-wrap:anywhere}
@@ -164,12 +164,21 @@ function renderCard(ctx, session, id) {
     card=next;draw();
   }
   window.addEventListener(channel,update);
+  const refresh=()=>rpc().get(ref,opt).then(row=>{
+    if(closed)return;
+    if(!card){card=row;status.textContent="";draw();}
+    else update({detail:row});
+  }).catch(error);
+  const stop=rpc().events.on("revised",evt=>{
+    if(evt.data.id===id&&evt.data.sessionID===session.id)return refresh();
+  });
+  window.addEventListener("focus",refresh);
   onCleanup(()=>{
-    closed=true;clearTimeout(timer);clearTimeout(feedback);window.removeEventListener(channel,update);
+    closed=true;stop();clearTimeout(timer);clearTimeout(feedback);window.removeEventListener(channel,update);window.removeEventListener("focus",refresh);
     if(dirty && !busy && card?.state==="draft")commit("edit",snapshot()).catch(()=>{});
   });
   status.textContent="Loading draft…"; draw();
-  rpc().get(ref,opt).then(row=>{card=row;status.textContent="";draw();}).catch(error);
+  refresh();
   return root;
 }
 exports.default=Plugin.define({setup(ctx){

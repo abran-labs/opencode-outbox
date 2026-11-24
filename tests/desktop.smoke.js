@@ -27,12 +27,17 @@ try {
     await page.evaluate(({id,sessionID})=>{
       window.clean?.();
       document.querySelector("main").replaceChildren(window.render({code:id,session:{
-        id:sessionID,key:sessionID,directory:"/",server:{client:{rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule})}}
+        id:sessionID,key:sessionID,directory:"/",server:{client:{rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule,events:{on:(_,fn)=>{window.onRevision=fn;return ()=>{delete window.onRevision;};}}})}}
       }}));
     },row);
     return row;
   }
-  await mount({body:"original"});
+  const original=await mount({body:"original"});
+  await page.getByRole("textbox").waitFor();
+  await store.revise({sessionID,id:original.id,append:" + correction"});
+  await page.evaluate(row=>window.onRevision({data:row}),original);
+  assert.equal(await page.getByRole("textbox").inputValue(),"original + correction");
+  assert.equal(await page.locator(".oc-outbox").count(),1);
   await page.getByRole("textbox").fill("edited copy");
   await page.getByRole("button",{name:"Copy",exact:true}).click();
   await page.getByRole("button",{name:"Copied",exact:true}).waitFor();

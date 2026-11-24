@@ -8,8 +8,9 @@ export default Plugin.define({id:"outbox", async setup(ctx) {
     const senders=(await ctx.tool.list()).filter(t=>/send/i.test(t.name) && /mail/i.test(t.id) && t.input?.properties?.to && t.input?.properties?.subject && t.input?.properties?.body);
     return senders.length===1?senders[0].id:undefined;
   },async sessionID=>(await ctx.session.get({sessionID})).agent);
-  await ctx.rpc.register(Outbox,{get:cards.get,change:cards.change,rule:cards.rule});
+  const registration=await ctx.rpc.register(Outbox,{get:cards.get,change:cards.change,rule:cards.rule});
   await ctx.session.hook("context", event=>{
+    if(event.tools.edit_message_card) event.system.push({type:"text",text:"For follow-up corrections, additions or rewrites to an existing draft, use edit_message_card with the UUID from its earlier outbox fence instead of creating a new card. Only create another card for a separate draft. After editing, briefly confirm in prose; never repeat the fence."});
     if(event.tools.create_message_card) event.system.push({type:"text",text:
       "For message requests, use create_message_card instead of drafting in prose or sending directly. Set intent to send only when the user explicitly requests delivery; this asks for Outbox review unless a saved rule applies. For explicit draft requests, omit intent or use draft, even if a send rule is enabled. Include the appropriate delivery tool, exact recipient addresses or stable IDs, and the sender account if known. For mail, include the tool even without a known recipient so the user can fill in To. Never guess an address or account. Repeat the returned outbox fence verbatim. Use a remote draft only when specifically requested. An Outbox synthetic send request is a delivery handoff: use the normal connector under its approval requirements, not create_message_card again."});
   });
@@ -27,6 +28,21 @@ export default Plugin.define({id:"outbox", async setup(ctx) {
       const outcome = card.state==="requested" ? "\nSend handed off to the originating session, not confirmed delivered. Do not send separately." :
         card.state==="unconfirmed" ? "\nSend handoff unconfirmed. Do not retry or send separately." : "";
       return {content:`\`\`\`outbox\n${card.id}\n\`\`\`${outcome}`};
+    }
+  }));
+  await ctx.tool.transform(editor=>editor.add({
+    name:"edit_message_card",
+    description:"Revise an existing unsent Outbox card in this session in place. Never sends. Use the UUID from its earlier fence. Append exact text (including spacing), replace one unique literal passage using old_text/new_text, or change named envelope fields. For a complete rewrite use the previous full body as old_text. Do not output a fence or create another card.",
+    input:{type:"object",additionalProperties:false,required:["id"],properties:{
+      id:field("Existing card UUID"),append:{type:"string",maxLength:100000},
+      old_text:{type:"string",minLength:1,maxLength:100000},new_text:{type:"string",maxLength:100000},
+      subject:field("Replacement subject"),from:field("Replacement sender"),to:field("Replacement recipient"),cc:field("Replacement Cc"),bcc:field("Replacement Bcc")
+    }},options:{codemode:false},execute:async(input,invocation)=>{
+      const sessionID=invocation.sessionID;
+      const card=await cards.revise({...input,sessionID});
+      try {await registration.events.emit("revised",{sessionID,id:card.id});}
+      catch {return {content:"Original draft updated. Reopen the conversation if the card has not refreshed. Do not repeat the edit."};}
+      return {content:"Original draft updated in place. Nothing sent. Confirm briefly without repeating the card."};
     }
   }));
 }});
