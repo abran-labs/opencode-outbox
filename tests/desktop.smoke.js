@@ -27,7 +27,7 @@ try {
     await page.evaluate(({id,sessionID})=>{
       window.clean?.();
       window.placement=code=>window.render({code,session:{
-        id:sessionID,key:sessionID,directory:"/",server:{client:{rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule,events:{on:(_,fn)=>{window.onRevision=fn;return ()=>{delete window.onRevision;};}}})}}
+        id:sessionID,key:sessionID,directory:"/",server:{client:{session:{prompt:async req=>{(window.rewrites??=[]).push(req);}},rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule,events:{on:(_,fn)=>{window.onRevision=fn;return ()=>{delete window.onRevision;};}}})}}
       }});
       document.querySelector("main").replaceChildren(window.placement(id));
     },row);
@@ -52,6 +52,21 @@ try {
     assert.equal(await page.locator(".receipt-label").innerText(),title);
   }
   assert.equal(marks.size,21);
+  for(const service of ["Discord","Mail"]){
+    const row=await mount({service,body:"Original wording",to:"fixture",delivery:"recording.record"});
+    await page.getByLabel("Message body").waitFor();
+    const rewrite=page.getByRole("button",{name:"Rewrite",exact:true});
+    assert.ok(await rewrite.isVisible(),"Rewrite should be visible on a fresh draft");
+    const body=service==="Mail"?"Unsent manual edit":"Original wording";
+    if(service==="Mail")await page.getByLabel("Message body").fill(body);
+    await rewrite.click();
+    await page.getByRole("status").getByText("Rewrite requested.").waitFor();
+    const req=await page.evaluate(()=>window.rewrites.at(-1));
+    assert.equal(req.sessionID,sessionID);
+    assert.ok(req.text.includes(row.id)&&req.text.includes(JSON.stringify(body))&&req.text.includes("edit_message_card"));
+    assert.equal((await store.get(row)).body,body);
+    assert.equal(notices.length,0);
+  }
   const original=await mount({service:"Support chat",body:"original"});
   assert.equal(await page.locator("header").innerText(),"Support chat");
   assert.equal(await page.getByRole("button",{name:"Send",exact:true}).count(),0);

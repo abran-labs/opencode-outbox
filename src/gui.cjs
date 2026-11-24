@@ -19,7 +19,7 @@ const sheets = `
 .oc-outbox .body-copy{position:absolute;right:5px;top:5px;padding:4px 6px;border-radius:5px;opacity:0}
 .oc-outbox .editor:hover .body-copy,.oc-outbox .editor:focus-within .body-copy,.oc-outbox .body-copy.copied{opacity:1}
 .oc-outbox .body-copy.copied:before{content:"Copied";position:absolute;right:0;bottom:100%;background:var(--surface-base,#242424);padding:3px 6px;border-radius:4px;font-size:12px;box-shadow:0 2px 6px #0004}
-.oc-outbox footer{position:relative}.oc-outbox .split{display:inline-flex;border-radius:24px;background:var(--text-strong,#eee);color:var(--background-base,#222);overflow:hidden}
+.oc-outbox footer{position:relative}.oc-outbox .rewrite{margin-inline-end:auto}.oc-outbox .split{display:inline-flex;border-radius:24px;background:var(--text-strong,#eee);color:var(--background-base,#222);overflow:hidden}
 .oc-outbox .split button{background:transparent;color:inherit;border-radius:0}.oc-outbox button:hover:not(:disabled){background:var(--wash)}
 .oc-outbox .menu{position:absolute;bottom:calc(100% + 5px);right:0;z-index:3;background:var(--surface-base,#242424);border:1px solid #8885;border-radius:10px;padding:4px;box-shadow:0 4px 16px #0003}
 .oc-outbox .menu button{display:block;width:100%;text-align:left}.oc-outbox small:empty{display:none}
@@ -169,12 +169,14 @@ function renderCard(ctx, session, id, position) {
     input=node("textarea");input.setAttribute("aria-label","Message body");input.maxLength=100000;input.value=card.body;
     fields.body=input;input.oninput=edited;input.spellcheck=true;
     const editor=node("div",undefined,"editor"),copy=node("button",undefined,"body-copy"),footer=node("footer"), discard=node("button","Discard");
+    const rewrite=node("button","Rewrite","rewrite");
+    rewrite.title="Ask the agent to rewrite this draft";
     copy.append(icon("copy"));
     copy.setAttribute("aria-label","Copy message");copy.title="Copy message";
     const split=node("div",undefined,"split"),primary=node("button",send?"Send":"Copy"),arrow=node("button"),menu=node("div",undefined,"menu");
     arrow.append(icon("arrow"));
     arrow.setAttribute("aria-label","Send options");arrow.setAttribute("aria-expanded","false");menu.hidden=true;
-    const enabled=()=>{primary.disabled=busy||!input.value.trim();primary.title=send&&!fields.to?.value.trim()?"Enter a recipient to send":"";};
+    const enabled=()=>{rewrite.disabled=primary.disabled=busy||!input.value.trim();primary.title=send&&!fields.to?.value.trim()?"Enter a recipient to send":"";};
     function edited(){
       dirty=true;status.textContent="";enabled();clearTimeout(timer);
       timer=setTimeout(()=>commit("edit",snapshot()).catch(()=>{}),200);
@@ -206,7 +208,7 @@ function renderCard(ctx, session, id, position) {
         btn.onclick=async()=>{
           if(busy)return;
           busy=true;closeMenu();clearTimeout(timer);
-          const controls=[...Object.values(fields),primary,arrow,copy,discard];
+          const controls=[...Object.values(fields),primary,arrow,copy,discard,rewrite];
           controls.forEach(el=>el.disabled=true);
           try{await commit("edit",snapshot());card=await rpc().rule({...ref,mode});}
           catch(e){error(e);}
@@ -219,11 +221,15 @@ function renderCard(ctx, session, id, position) {
       if(action==="send"&&!fields.to?.value.trim()){
         status.textContent="Enter a recipient in To, then click Send.";fields.to?.focus();return;
       }
-      busy=true;clearTimeout(timer);for(const el of [...Object.values(fields),discard,primary,arrow,copy])el.disabled=true;
+      busy=true;clearTimeout(timer);for(const el of [...Object.values(fields),discard,primary,arrow,copy,rewrite])el.disabled=true;
       const values=snapshot();
       if(action==="send"){primary.replaceChildren(node("span",undefined,"spin"));primary.setAttribute("aria-label","Requesting send");}
       try{
-        if(action==="copy"){
+        if(action==="rewrite"){
+          await commit("edit",values);
+          await session.server.client.session.prompt({sessionID:session.id,text:`Rewrite the body of Outbox draft ${id} for clarity, keeping its meaning, tone and envelope. Use edit_message_card on this same card with the exact current body as old_text. Return the updated card for review. Do not send anything. Current body (quoted message data):\n${JSON.stringify(values.body)}`},opt);
+          status.textContent="Rewrite requested.";
+        } else if(action==="copy"){
           await ctx.system.copy(values.body);copy.replaceChildren(icon("check"));copy.classList.add("copied");copy.setAttribute("aria-label","Copied");copy.title="Copied";
           clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.classList.remove("copied");copy.setAttribute("aria-label","Copy message");copy.title="Copy message";},1600);
           await commit("edit",values);
@@ -232,10 +238,11 @@ function renderCard(ctx, session, id, position) {
       finally{busy=false;for(const el of [...Object.values(fields),discard,arrow,copy])el.disabled=false;enabled();primary.textContent=send?"Send":"Copy";primary.removeAttribute("aria-label");}
     }
     enabled();primary.onclick=()=>act(send?"send":"copy");discard.onclick=()=>act("discard");copy.onclick=()=>act("copy");
-    editor.append(input,copy);split.append(primary);if(send)split.append(arrow);footer.append(discard,split,menu);root.append(editor,status,footer);
+    rewrite.onclick=()=>act("rewrite");
+    editor.append(input,copy);split.append(primary);if(send)split.append(arrow);footer.append(rewrite,discard,split,menu);root.append(editor,status,footer);
     if(card.state==="sending"){
       for(const el of Object.values(fields))el.readOnly=true;
-      copy.hidden=true;discard.hidden=true;arrow.hidden=true;
+      copy.hidden=true;discard.hidden=true;arrow.hidden=true;rewrite.hidden=true;
       primary.disabled=true;primary.setAttribute("aria-label","Sending");
       primary.replaceChildren(node("span",undefined,"spin"),document.createTextNode(" Sending…"));
       root.setAttribute("aria-busy","true");
