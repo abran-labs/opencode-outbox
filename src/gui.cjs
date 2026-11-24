@@ -1,6 +1,7 @@
 // A standalone, hand-authored GUI entry: Git installs need no build or install scripts.
 const {Plugin, CodeBlock} = require("@opencode/plugin/gui");
-const {onCleanup} = require("solid-js");
+const {onCleanup,getOwner,createSignal} = require("solid-js");
+const {render} = require("solid-js/web");
 const contract = {id:"outbox", methods:{get:{},change:{},rule:{}}, events:{revised:{}}};
 const sheets = `
 .oc-outbox[hidden],[data-component="markdown-code"][data-language="outbox"]:has(.oc-outbox[hidden]){display:none}
@@ -16,10 +17,10 @@ const sheets = `
 .oc-outbox input.subject{font-weight:600}.oc-outbox .editor{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;border-radius:8px;margin:7px 0}
 .oc-outbox .editor:hover,.oc-outbox .editor:focus-within,.oc-outbox input:hover,.oc-outbox input:focus{background:var(--wash)}
 .oc-outbox input:focus,.oc-outbox textarea:focus{outline:none}.oc-outbox textarea{resize:none;display:block;border:0;padding:9px 4px 9px 8px;line-height:1.55;min-height:5.5em;max-height:60vh}
-.oc-outbox .editor-actions{align-self:start;display:flex;align-items:center;gap:2px;margin:5px 5px 0 0}
-.oc-outbox .editor-actions[hidden]{display:none}.oc-outbox .editor-actions .rewrite{font-size:13px;padding:4px 7px;border-radius:5px}
-.oc-outbox .body-copy{position:relative;padding:4px 6px;border-radius:5px}
-.oc-outbox .body-copy.copied:before{content:"Copied";position:absolute;right:0;bottom:100%;background:var(--surface-base,#242424);padding:3px 6px;border-radius:4px;font-size:12px;box-shadow:0 2px 6px #0004}
+.oc-outbox .editor-actions{align-self:start;display:flex;align-items:center;gap:2px;margin:5px 5px 0 0;opacity:0;pointer-events:none}
+.oc-outbox .editor:hover .editor-actions,.oc-outbox .editor-actions:has(:focus-visible){opacity:1;pointer-events:auto}
+@media(hover:none){.oc-outbox .editor-actions{opacity:1;pointer-events:auto}}
+.oc-outbox .editor-actions[hidden]{display:none}
 .oc-outbox footer{position:relative}.oc-outbox .split{display:inline-flex;border-radius:24px;background:var(--text-strong,#eee);color:var(--background-base,#222);overflow:hidden}
 .oc-outbox .split button{background:transparent;color:inherit;border-radius:0}.oc-outbox button:hover:not(:disabled){background:var(--wash)}
 .oc-outbox .menu{position:absolute;bottom:calc(100% + 5px);right:0;z-index:3;background:var(--surface-base,#242424);border:1px solid #8885;border-radius:10px;padding:4px;box-shadow:0 4px 16px #0003}
@@ -31,7 +32,7 @@ const sheets = `
 .oc-outbox .receipt-text{min-width:0;overflow-wrap:anywhere}.oc-outbox .receipt-meta{color:var(--text-base,#aaa)}
 .oc-outbox .field{display:grid;grid-template-columns:max-content minmax(0,1fr);overflow-wrap:normal}
 .oc-outbox .field span{white-space:nowrap;word-break:normal;opacity:.64}.oc-outbox input,.oc-outbox textarea{color:inherit}.oc-outbox input::placeholder{color:currentColor;opacity:.45}
-.oc-outbox .body-copy{width:30px;height:30px;display:grid;place-items:center;padding:0}
+.oc-outbox .editor-actions button{width:30px;height:30px;display:grid;place-items:center;padding:0;border-radius:5px}
 .oc-outbox svg{width:18px;height:18px;display:block;flex:none}
 .oc-outbox .menu{width:min(252px,100%);z-index:4;padding:6px}.oc-outbox .menu button{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:7px 10px;border-radius:6px;font-size:14px;line-height:1.35}
 .oc-outbox .menu button small{grid-column:1/-1;font-size:12px;opacity:.65}`;
@@ -103,12 +104,14 @@ function icon(name){
     p.setAttribute("d","M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z");
     svg.append(p);return svg;
   }
-  p.setAttribute("d",{mail:"M3 5h18v14H3z M3 6l9 7 9-7",chat:"M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-6 3v-3a2 2 0 0 1-1-2V6a2 2 0 0 1 2-2z",copy:"M9 8h11v13H9z M15 8V3H4v13h5",check:"m4 12 5 5L20 6",arrow:"m7 10 5 5 5-5"}[name]);
+  p.setAttribute("d",{mail:"M3 5h18v14H3z M3 6l9 7 9-7",chat:"M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-6 3v-3a2 2 0 0 1-1-2V6a2 2 0 0 1 2-2z",rewrite:"M20 10a8 8 0 1 0-.8 6M20 4v6h-6",copy:"M9 8h11v13H9z M15 8V3H4v13h5",check:"m4 12 5 5L20 6",arrow:"m7 10 5 5 5-5"}[name]);
   for(const [k,v] of Object.entries({fill:"none",stroke:"currentColor","stroke-width":"1.7","stroke-linecap":"round","stroke-linejoin":"round"}))p.setAttribute(k,v);
   svg.append(p);return svg;
 }
 
 function renderCard(ctx, session, id, position) {
+  const owner=getOwner();
+  let disposeActions;
   const ref={id,sessionID:session.id}, opt={location:{directory:session.directory}};
   const rpc=()=>session.server.client.rpc(contract);
   const root=node("section",undefined,"oc-outbox");
@@ -139,6 +142,7 @@ function renderCard(ctx, session, id, position) {
   }
   function draw(){
     if(closed)return;
+    disposeActions?.();disposeActions=undefined;
     root.replaceChildren(node("style",sheets));
     if(!card){root.append(status);return;}
     root.hidden=position!==(card.position||0);
@@ -170,10 +174,10 @@ function renderCard(ctx, session, id, position) {
     input=node("textarea");input.setAttribute("aria-label","Message body");input.maxLength=100000;input.value=card.body;
     fields.body=input;input.oninput=edited;input.spellcheck=true;
     const editor=node("div",undefined,"editor"),copy=node("button",undefined,"body-copy"),footer=node("footer"), discard=node("button","Discard");
-    const rewrite=node("button","Rewrite","rewrite");
-    rewrite.title="Ask the agent to rewrite this draft";
+    const rewrite=node("button",undefined,"rewrite"),[copyLabel,setCopyLabel]=createSignal("Copy");
+    rewrite.append(icon("rewrite"));rewrite.setAttribute("aria-label","Rewrite");
     copy.append(icon("copy"));
-    copy.setAttribute("aria-label","Copy message");copy.title="Copy message";
+    copy.setAttribute("aria-label","Copy message");
     const split=node("div",undefined,"split"),primary=node("button",send?"Send":"Copy"),arrow=node("button"),menu=node("div",undefined,"menu");
     arrow.append(icon("arrow"));
     arrow.setAttribute("aria-label","Send options");arrow.setAttribute("aria-expanded","false");menu.hidden=true;
@@ -231,8 +235,8 @@ function renderCard(ctx, session, id, position) {
           await session.server.client.session.prompt({sessionID:session.id,text:`Rewrite the body of Outbox draft ${id} for clarity, keeping its meaning, tone and envelope. Use edit_message_card on this same card with the exact current body as old_text. Return the updated card for review. Do not send anything. Current body (quoted message data):\n${JSON.stringify(values.body)}`},opt);
           status.textContent="Rewrite requested.";
         } else if(action==="copy"){
-          await ctx.system.copy(values.body);copy.replaceChildren(icon("check"));copy.classList.add("copied");copy.setAttribute("aria-label","Copied");copy.title="Copied";
-          clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.classList.remove("copied");copy.setAttribute("aria-label","Copy message");copy.title="Copy message";},1600);
+          await ctx.system.copy(values.body);copy.replaceChildren(icon("check"));copy.setAttribute("aria-label","Copied");setCopyLabel("Copied");
+          clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.setAttribute("aria-label","Copy message");setCopyLabel("Copy");},1600);
           await commit("edit",values);
         } else {await commit(action,values);draw();}
       }catch(e){error(e);}
@@ -240,7 +244,8 @@ function renderCard(ctx, session, id, position) {
     }
     enabled();primary.onclick=()=>act(send?"send":"copy");discard.onclick=()=>act("discard");copy.onclick=()=>act("copy");
     rewrite.onclick=()=>act("rewrite");
-    const actions=node("div",undefined,"editor-actions");actions.append(rewrite,copy);
+    const actions=node("div",undefined,"editor-actions");
+    disposeActions=render(()=>[ctx.ui.Tooltip({value:"Rewrite",children:rewrite}),ctx.ui.Tooltip({get value(){return copyLabel();},children:copy})],actions,undefined,{owner});
     editor.append(input,actions);split.append(primary);if(send)split.append(arrow);footer.append(discard,split,menu);root.append(editor,status,footer);
     if(card.state==="sending"){
       for(const el of Object.values(fields))el.readOnly=true;
@@ -267,6 +272,7 @@ function renderCard(ctx, session, id, position) {
   });
   window.addEventListener("focus",refresh);
   onCleanup(()=>{
+    disposeActions?.();
     closed=true;stop();clearTimeout(timer);clearTimeout(feedback);window.removeEventListener(channel,update);window.removeEventListener("focus",refresh);
     if(dirty && !busy && card?.state==="draft")commit("edit",snapshot()).catch(()=>{});
   });

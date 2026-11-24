@@ -14,12 +14,12 @@ try {
   await page.setContent("<main></main>");
   await page.evaluate(()=>{
     window.exports={};
-    window.require=name=>name==="solid-js"?{onCleanup:f=>window.clean=f}:{Plugin:{define:x=>x},CodeBlock:"code"};
+    window.require=name=>name==="solid-js"?{onCleanup:f=>window.clean=f,getOwner:()=>null,createSignal:v=>[()=>v,next=>{v=next;}]}:name==="solid-js/web"?{render:(fn,el)=>{el.append(...fn());return ()=>el.replaceChildren();}}:{Plugin:{define:x=>x},CodeBlock:"code"};
   });
   await page.addScriptTag({content:await readFile(new URL("../src/gui.cjs",import.meta.url),"utf8")});
   await page.evaluate(()=>{
     window.exports.default.setup({
-      add:(_,x)=>window.render=x.render,system:{copy:async t=>{window.copied=t}}
+      add:(_,x)=>window.render=x.render,system:{copy:async t=>{window.copied=t}},ui:{Tooltip:props=>{const el=document.createElement("span");el.dataset.tooltip=props.value;el.append(props.children);return el;}}
     });
   });
   async function mount(fields) {
@@ -56,7 +56,14 @@ try {
     const row=await mount({service,body:"Original wording",to:"fixture",delivery:"recording.record"});
     await page.getByLabel("Message body").waitFor();
     const rewrite=page.getByRole("button",{name:"Rewrite",exact:true});
-    assert.ok(await rewrite.isVisible(),"Rewrite should be visible on a fresh draft");
+    await page.mouse.move(0,0);
+    const actions=page.locator(".editor-actions");
+    assert.equal(await actions.evaluate(el=>getComputedStyle(el).opacity),"0");
+    await page.getByLabel("Message body").hover();
+    assert.equal(await actions.evaluate(el=>getComputedStyle(el).opacity),"1");
+    assert.equal(await rewrite.innerText(),"");
+    assert.equal(await rewrite.locator("svg").count(),1);
+    assert.equal(await rewrite.evaluate(el=>el.closest("[data-tooltip]")?.dataset.tooltip),"Rewrite");
     const body=service==="Mail"?"Unsent manual edit":"Original wording";
     if(service==="Mail")await page.getByLabel("Message body").fill(body);
     await rewrite.click();
