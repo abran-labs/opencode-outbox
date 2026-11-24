@@ -13,13 +13,14 @@ const sheets = `
 .oc-outbox{--wash:color-mix(in srgb,currentColor 8%,transparent);gap:5px;border-radius:20px;padding:16px}
 .oc-outbox header{margin-bottom:6px}.oc-outbox .field{display:flex;align-items:center;gap:8px;font-size:14px;padding:4px 0}.oc-outbox .field span{opacity:.65}
 .oc-outbox input{background:transparent;color:inherit;min-width:0;width:100%;border:0;border-radius:6px;padding:5px;font:inherit}
-.oc-outbox input.subject{font-weight:600}.oc-outbox .editor{position:relative;border-radius:8px;margin:7px 0}
+.oc-outbox input.subject{font-weight:600}.oc-outbox .editor{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;border-radius:8px;margin:7px 0}
 .oc-outbox .editor:hover,.oc-outbox .editor:focus-within,.oc-outbox input:hover,.oc-outbox input:focus{background:var(--wash)}
-.oc-outbox input:focus,.oc-outbox textarea:focus{outline:none}.oc-outbox textarea{resize:none;display:block;border:0;padding:9px 40px 9px 8px;line-height:1.55;min-height:5.5em;max-height:60vh}
-.oc-outbox .body-copy{position:absolute;right:5px;top:5px;padding:4px 6px;border-radius:5px;opacity:0}
-.oc-outbox .editor:hover .body-copy,.oc-outbox .editor:focus-within .body-copy,.oc-outbox .body-copy.copied{opacity:1}
+.oc-outbox input:focus,.oc-outbox textarea:focus{outline:none}.oc-outbox textarea{resize:none;display:block;border:0;padding:9px 4px 9px 8px;line-height:1.55;min-height:5.5em;max-height:60vh}
+.oc-outbox .editor-actions{align-self:start;display:flex;align-items:center;gap:2px;margin:5px 5px 0 0}
+.oc-outbox .editor-actions[hidden]{display:none}.oc-outbox .editor-actions .rewrite{font-size:13px;padding:4px 7px;border-radius:5px}
+.oc-outbox .body-copy{position:relative;padding:4px 6px;border-radius:5px}
 .oc-outbox .body-copy.copied:before{content:"Copied";position:absolute;right:0;bottom:100%;background:var(--surface-base,#242424);padding:3px 6px;border-radius:4px;font-size:12px;box-shadow:0 2px 6px #0004}
-.oc-outbox footer{position:relative}.oc-outbox .rewrite{margin-inline-end:auto}.oc-outbox .split{display:inline-flex;border-radius:24px;background:var(--text-strong,#eee);color:var(--background-base,#222);overflow:hidden}
+.oc-outbox footer{position:relative}.oc-outbox .split{display:inline-flex;border-radius:24px;background:var(--text-strong,#eee);color:var(--background-base,#222);overflow:hidden}
 .oc-outbox .split button{background:transparent;color:inherit;border-radius:0}.oc-outbox button:hover:not(:disabled){background:var(--wash)}
 .oc-outbox .menu{position:absolute;bottom:calc(100% + 5px);right:0;z-index:3;background:var(--surface-base,#242424);border:1px solid #8885;border-radius:10px;padding:4px;box-shadow:0 4px 16px #0003}
 .oc-outbox .menu button{display:block;width:100%;text-align:left}.oc-outbox small:empty{display:none}
@@ -239,10 +240,11 @@ function renderCard(ctx, session, id, position) {
     }
     enabled();primary.onclick=()=>act(send?"send":"copy");discard.onclick=()=>act("discard");copy.onclick=()=>act("copy");
     rewrite.onclick=()=>act("rewrite");
-    editor.append(input,copy);split.append(primary);if(send)split.append(arrow);footer.append(rewrite,discard,split,menu);root.append(editor,status,footer);
+    const actions=node("div",undefined,"editor-actions");actions.append(rewrite,copy);
+    editor.append(input,actions);split.append(primary);if(send)split.append(arrow);footer.append(discard,split,menu);root.append(editor,status,footer);
     if(card.state==="sending"){
       for(const el of Object.values(fields))el.readOnly=true;
-      copy.hidden=true;discard.hidden=true;arrow.hidden=true;rewrite.hidden=true;
+      actions.hidden=true;discard.hidden=true;arrow.hidden=true;
       primary.disabled=true;primary.setAttribute("aria-label","Sending");
       primary.replaceChildren(node("span",undefined,"spin"),document.createTextNode(" Sending…"));
       root.setAttribute("aria-busy","true");
