@@ -10,6 +10,7 @@ try {
   const sessionID="ses_smoke";
   await page.exposeFunction("fetchDraft",args=>store.get(args));
   await page.exposeFunction("changeDraft",args=>store.change(args));
+  await page.exposeFunction("setRule",args=>store.rule(args));
   await page.setContent("<main></main>");
   await page.evaluate(()=>{
     window.exports={};
@@ -26,7 +27,7 @@ try {
     await page.evaluate(({id,sessionID})=>{
       window.clean?.();
       document.querySelector("main").replaceChildren(window.render({code:id,session:{
-        id:sessionID,key:sessionID,directory:"/",server:{client:{rpc:()=>({get:window.fetchDraft,change:window.changeDraft})}}
+        id:sessionID,key:sessionID,directory:"/",server:{client:{rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule})}}
       }}));
     },row);
     return row;
@@ -45,13 +46,22 @@ try {
   assert.equal(JSON.parse(notices[0].text.split("\n").at(-1)).body,"edited send");
   await mount({body:"Mail draft",service:"Mail",delivery:"test.send_mail"});
   const send=page.getByRole("button",{name:"Send",exact:true});
-  assert.equal(await send.isDisabled(),true);
+  await send.click();
+  assert.equal(await page.getByLabel("To",{exact:true}).evaluate(el=>document.activeElement===el),true);
+  assert.equal(notices.length,1);
   await page.getByRole("textbox",{name:"Subject",exact:true}).fill("Edited subject");
+  await page.getByRole("textbox",{name:"From",exact:true}).fill("sender@example.test");
   await page.getByRole("textbox",{name:"To",exact:true}).fill("fixture@example.test");
   await page.getByRole("textbox",{name:"Cc",exact:true}).fill("cc@example.test");
   await page.getByRole("button",{name:"Send options"}).click();
-  await page.getByRole("button",{name:"Copy message instead"}).click();
-  await page.getByRole("button",{name:"Copied"}).waitFor();
+  await page.getByRole("button",{name:/Allow recipient/}).click();
+  await page.getByRole("button",{name:"Send options"}).click();
+  assert.equal(await page.getByRole("button",{name:/Allow recipient/}).getAttribute("aria-pressed"),"true");
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({width:320,height:600});
+  for(const label of await page.locator(".oc-outbox .field span").all()){
+    assert.ok(await label.evaluate(el=>{const r=new Range();r.selectNodeContents(el);return r.getClientRects().length===1;}),"field label should fit on one line");
+  }
   assert.equal(notices.length,1);
   await send.click();
   await page.getByText("Mail · Send requested · fixture@example.test").waitFor();
