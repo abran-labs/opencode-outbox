@@ -2,8 +2,6 @@
 
 # OpenCode Outbox
 
-**Edit messages before they go out.**
-
 ## Install
 
 ```sh
@@ -12,15 +10,13 @@ opencode plugin add github:abran-labs/opencode-outbox
 
 ## Message cards
 
-Ask your agent in OpenCode Desktop V2 to draft a message. Edit the draft directly on its local card; creating a card doesn't send anything.
+Ask your agent to draft a message. Edit the draft directly on its local card. Send it.
 
 | Action | What it does |
 | --- | --- |
-| Send | Asks the current session's agent to deliver your exact edited message through its usual messaging MCP. Connector permissions and approvals still apply. |
-| Copy | Copies your edited message for manual sending. |
+| Send | Asks the agent to deliver your exact draft through its usual messaging MCP. (e.g. https://github.com/taylorwilsdon/google_workspace_mcp) |
+| Copy | Copies your exact draft to your clipboard. |
 | Discard | Closes the draft without sending it. |
-
-A **Send requested** receipt means the agent was asked to send, not that delivery was confirmed.
 
 ## Uninstall
 
