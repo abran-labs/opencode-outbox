@@ -99,22 +99,22 @@ test("recipient rule never widens to a different agent, service, tool, account, 
   assert.equal(notices.length,0);
 });
 
-test("agent mode only bypasses review for deliverable send intent; approval restores review",async()=>{
+test("global mode only bypasses review for deliverable send intent; approval restores review",async()=>{
   const {cards,notices}=fixture();
   const card=await cards.create("ses_a",message,"writer");
   const ref={sessionID:"ses_a",id:card.id};
-  await assert.rejects(cards.rule({...ref,sessionID:"ses_b",mode:"agent"}));
+  await assert.rejects(cards.rule({...ref,sessionID:"ses_b",mode:"global"}));
   await cards.rule({...ref,mode:"recipient"});
   assert.equal((await cards.create("ses_b",{...message,intent:"draft"},"writer")).state,"draft");
-  assert.equal((await cards.rule({...ref,mode:"agent"})).mode,"agent");
+  assert.equal((await cards.rule({...ref,mode:"global"})).mode,"global");
   assert.equal((await cards.create("ses_b",message,"writer")).state,"draft");
   assert.equal((await cards.create("ses_b",{...message,intent:"draft"},"writer")).state,"draft");
   assert.equal((await cards.create("ses_b",{...message,to:"",intent:"send"},"writer")).state,"draft");
-  assert.equal((await cards.create("ses_b",{...message,to:"new@example.com",intent:"send"},"other")).state,"draft");
+  assert.equal((await cards.create("ses_b",{...message,to:"new@example.com",intent:"send"},"other")).state,"sending");
   assert.equal((await cards.create("ses_b",{...message,to:"new@example.com",intent:"send"},"writer")).state,"sending");
   assert.equal((await cards.rule({...ref,mode:"approval"})).mode,"approval");
   assert.equal((await cards.create("ses_b",{...message,intent:"send"},"writer")).state,"draft");
-  assert.equal(notices.length,1);
+  assert.equal(notices.length,2);
 });
 
 test("recipient rule requires a sender account and cannot be set on closed cards",async()=>{
@@ -123,7 +123,7 @@ test("recipient rule requires a sender account and cannot be set on closed cards
   const ref={sessionID:card.sessionID,id:card.id};
   await assert.rejects(cards.rule({...ref,mode:"recipient"}));
   await cards.change({...ref,revision:0,action:"discard"});
-  await assert.rejects(cards.rule({...ref,mode:"agent"}));
+  await assert.rejects(cards.rule({...ref,mode:"global"}));
 });
 
 test("old cards use the session agent or build and pin the agent on a rule change",async()=>{
@@ -134,7 +134,7 @@ test("old cards use the session agent or build and pin the agent on a rule chang
     rows.set(`card/${sessionID}/${id}`,{...message,id,sessionID,state:"draft",revision:0});
     const ref={sessionID,id};
     assert.equal((await cards.get(ref)).agent,owner);
-    assert.equal((await cards.rule({...ref,mode:"agent"})).mode,"agent");
+    assert.equal((await cards.rule({...ref,mode:"global"})).mode,"global");
     agent="other";
     assert.equal((await cards.get(ref)).agent,owner);
     assert.equal((await cards.create("ses_b",{...message,intent:"send"},owner)).state,"sending");
@@ -144,7 +144,7 @@ test("old cards use the session agent or build and pin the agent on a rule chang
 test("uncertain rule handoff preserves non-retryable card state",async()=>{
   const {cards,notices}=fixture(true);
   const card=await cards.create("ses_a",message,"writer");
-  await cards.rule({sessionID:card.sessionID,id:card.id,mode:"agent"});
+  await cards.rule({sessionID:card.sessionID,id:card.id,mode:"global"});
   const next=await cards.create("ses_b",{...message,intent:"send"},"writer");
   assert.equal(next.state,"unconfirmed");
   assert.equal((await cards.get(next)).state,"unconfirmed");

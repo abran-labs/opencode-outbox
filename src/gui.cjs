@@ -58,7 +58,14 @@ function renderCard(ctx, session, id) {
   const root=node("section",undefined,"oc-outbox");
   const channel=`outbox:${session.key}:${id}`;
   let card, timer, feedback, input, fields={}, busy=false, closed=false, dirty=false, tail=Promise.resolve();
-  const snapshot=()=>Object.fromEntries(Object.entries(fields).map(([k,el])=>[k,el.value]));
+  const display=(k,value)=>{
+    if(!/^discord\b/i.test(card?.service||"")||!["from","to"].includes(k))return value;
+    return value.replace(/\s*\((?:(?:DM(?: channel)?|channel|user)(?: ID)?\s*[:#]?\s*)?\d{17,20}\)\s*$/i,"").replace(/^\d{17,20}$/,"");
+  };
+  const snapshot=()=>Object.fromEntries(Object.entries(fields).map(([k,el])=>{
+    const raw=card[k]??"";
+    return [k,el.value===display(k,raw)?raw:el.value];
+  }));
   const status=node("small"); status.setAttribute("role","status");
   const error=e=>{if(!closed)status.textContent=e?.message||"Request failed. Reopen the card to reload.";};
   function commit(action,values) {
@@ -81,7 +88,7 @@ function renderCard(ctx, session, id) {
     const title=card.service||"Message";
     if(!["draft","sending"].includes(card.state)){
       const outcome={discarded:"Discarded",sent:"Sent",requested:"Delivery not confirmed",unconfirmed:"Delivery not confirmed",uncertain:"Delivery not confirmed",failed:"Not sent"};
-      root.append(node("small",[title,outcome[card.state],card.to].filter(Boolean).join(" · ")));
+      root.append(node("small",[title,outcome[card.state],display("to",card.to||"")].filter(Boolean).join(" · ")));
       if(card.detail&&["failed","uncertain"].includes(card.state))root.append(node("small",card.detail));
       return;
     }
@@ -89,7 +96,7 @@ function renderCard(ctx, session, id) {
     const mail=/^(?:e-?mail|gmail|mail)$/i.test(title),send=!!card.delivery;
     fields={};
     function field(k,label,placeholder){
-      const el=node("input");fields[k]=el;el.value=card[k]||"";el.maxLength=1024;el.placeholder=placeholder;el.setAttribute("aria-label",label);
+      const el=node("input");fields[k]=el;el.value=display(k,card[k]||"");el.maxLength=1024;el.placeholder=placeholder;el.setAttribute("aria-label",label);
       el.oninput=edited;
       el.spellcheck=k==="subject";
       if(k==="subject"){el.className="subject";root.append(el);return;}
@@ -118,7 +125,8 @@ function renderCard(ctx, session, id) {
       const before=snapshot();
       try{
         clearTimeout(timer);await commit("edit",before);
-        if(closed||card.state!=="draft"||Object.entries(before).some(([k,v])=>fields[k]?.value!==v))return;
+        const now=snapshot();
+        if(closed||card.state!=="draft"||Object.entries(before).some(([k,v])=>now[k]!==v))return;
         menu.hidden=false;arrow.setAttribute("aria-expanded","true");menuItems();
         menu.querySelector("button:not(:disabled)")?.focus();
       }catch(e){error(e);}
@@ -127,7 +135,7 @@ function renderCard(ctx, session, id) {
     footer.onfocusout=e=>{if(!footer.contains(e.relatedTarget))closeMenu();};
     function menuItems(){
       menu.replaceChildren();
-      for(const [mode,label,hint] of [["recipient","Allow recipient","Skip review for this recipient"],["approval","Needs approval","Review before sending"],["agent","Disable drafts for agent","Skip review on send requests"]]){
+      for(const [mode,label,hint] of [["recipient","Allow recipient","Skip review for this recipient"],["approval","Needs approval","Review before sending"],["global","Disable drafts","Skip review for send requests across all agents"]]){
         const btn=node("button"),checked=mode===(card.mode||"approval");
         if(mode==="recipient"&&(!fields.to?.value.trim()||!(fields.from?.value||card.from||"").trim())){
           btn.disabled=true;btn.title="Enter From and To to save a recipient rule.";

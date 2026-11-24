@@ -10,7 +10,7 @@ export default Plugin.define({id:"outbox", async setup(ctx) {
   },async sessionID=>(await ctx.session.get({sessionID})).agent);
   const registration=await ctx.rpc.register(Outbox,{get:cards.get,change:cards.change,rule:cards.rule});
   await ctx.session.hook("context", event=>{
-    if(event.tools.create_message_card) event.system.push({type:"text",text:"For connectors using opaque IDs, resolve human-readable labels with the available connector and put the name first, then the exact routing ID in parentheses. Prefer usernames over display names. For Discord: From @username (user ID), To @username (DM channel ID) or #channel (channel ID). For email keep ordinary email addresses. Never invent a username or ID."});
+    if(event.tools.create_message_card) event.system.push({type:"text",text:"Resolve Discord identities through the connector. When the account or DM listing lacks a display name, use the connector's user lookup by user ID before falling back to @username. Put the display name first and the @username in parentheses, then retain the exact routing ID: From Display Name (@username) (user ID), To Display Name (@username) (DM channel ID). The card hides routing IDs. For guild channels use #channel (channel ID); for mail use ordinary email addresses. Never invent names or IDs."});
     if(event.tools.edit_message_card) event.system.push({type:"text",text:"For follow-up corrections, additions or rewrites to an existing draft, use edit_message_card with the UUID from its earlier outbox fence instead of creating a new card. Only create another card for a separate draft. After editing, briefly confirm in prose; never repeat the fence."});
     if(event.tools.create_message_card) event.system.push({type:"text",text:
       "For message requests, use create_message_card instead of drafting in prose or sending directly. Set intent to send only when the user explicitly requests delivery; this asks for Outbox review unless a saved rule applies. For explicit draft requests, omit intent or use draft, even if a send rule is enabled. Include the appropriate delivery tool, exact recipient addresses or stable IDs, and the sender account if known. For mail, include the tool even without a known recipient so the user can fill in To. Never guess an address or account. Repeat the returned outbox fence verbatim. Use a remote draft only when specifically requested. An Outbox synthetic send request is a delivery handoff: use the normal connector under its approval requirements, not create_message_card again."});
@@ -21,8 +21,8 @@ export default Plugin.define({id:"outbox", async setup(ctx) {
     input:{type:"object",additionalProperties:false,required:["body"],properties:{
       intent:{enum:["draft","send"],description:"Use send only for an explicit user request to deliver. Defaults to draft."},
       body:{type:"string",minLength:1,maxLength:100000},service:field("Display name, e.g. Discord or Mail"),
-      to:field("Email address, or resolved username/channel name followed by the destination ID in parentheses. For DMs prefer @username (DM channel ID)."),
-      from:field("Email address or alias; for ID-based accounts prefer @username (user ID) from connector metadata."),cc:field("Cc addresses"),bcc:field("Bcc addresses"),subject:field("Message subject"),
+      to:field("Email address, Display Name (@username) (DM channel ID), or #channel (channel ID). Resolve names and IDs through the connector."),
+      from:field("Email address or alias; for Discord use Display Name (@username) (user ID) from connector metadata."),cc:field("Cc addresses"),bcc:field("Bcc addresses"),subject:field("Message subject"),
       delivery:field("Name(s) of available delivery tool(s). A hint to the session agent, never executed as code.")
     }},options:{codemode:false},execute:async(input,invocation)=>{
       const card = await cards.create(invocation.sessionID,input,invocation.agent);

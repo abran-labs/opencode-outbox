@@ -6,6 +6,7 @@ const key = ({sessionID, id}) => {
   return `card/${sessionID}/${id}`;
 };
 const ruleKey = agent => `rule/${encodeURIComponent(agent)}`;
+const globalKey = "settings/skip-send-review";
 const ruleBusy = new Set();
 const deliverable = card => Boolean(card.delivery?.trim() && card.to?.trim() && card.body.trim());
 function recipientKey({service,delivery,from,to,cc,bcc}) {
@@ -31,7 +32,9 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
     return card;
   }
   async function view(card) {
-    return {...card,mode:modeOf(card,await storage.get(ruleKey(card.agent)))};
+    const global=await storage.get(globalKey);
+    const local=await storage.get(ruleKey(card.agent));
+    return {...card,mode:global===true?"global":modeOf(card,global===undefined?local:{...local,agent:false})};
   }
   async function get(ref) {
     return view(await load(ref));
@@ -74,10 +77,10 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
     return withDraft(ref,async(card,k)=>{
       const recipient = recipientKey(card);
       if (ref.mode === "recipient" && !recipient) throw Error("Recipient rules require a service, delivery tool, sender account and recipient.");
-      if (!["recipient","approval","agent"].includes(ref.mode)) throw Error("Unknown send mode.");
+      if (!["recipient","approval","global","agent"].includes(ref.mode)) throw Error("Unknown send mode.");
       const rk = ruleKey(card.agent);
-      if (ruleBusy.has(rk)) throw Error("Another send rule edit is in progress.");
-      ruleBusy.add(rk);
+      if (ruleBusy.has(globalKey)) throw Error("Another send rule edit is in progress.");
+      ruleBusy.add(globalKey);
       try {
         const policy = await storage.get(rk) || {recipients:{}};
         policy.agent = ref.mode === "agent";
@@ -86,8 +89,9 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
         card.revision++;
         await storage.set(k,card);
         await storage.set(rk,policy);
-        return {...card,mode:modeOf(card,policy)};
-      } finally { ruleBusy.delete(rk); }
+        if(ref.mode!=="agent")await storage.set(globalKey,ref.mode==="global");
+        return view(card);
+      } finally { ruleBusy.delete(globalKey); }
     });
   }
   async function change(ref) {

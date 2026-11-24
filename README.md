@@ -15,7 +15,7 @@ Ask your agent to draft a message. Edit the draft directly on its local card. Se
 | Action | What it does |
 | --- | --- |
 | Send | Asks the agent to deliver your exact draft through its usual messaging MCP. (e.g. https://github.com/taylorwilsdon/google_workspace_mcp) |
-| Send ▾ | Choose **Allow recipient**, **Needs approval**, or **Disable drafts for agent** for future send requests. Asking for a draft still creates a draft. |
+| Send ▾ | **Disable drafts** skips Outbox review for explicit send requests across sessions and agents. **Allow recipient** limits that shortcut to a recipient. Asking for a draft always creates one. |
 | Copy | Copies your exact draft to your clipboard. |
 | Discard | Closes the draft without sending it. |
 
