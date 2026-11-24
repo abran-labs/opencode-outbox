@@ -12,7 +12,7 @@ opencode plugin add github:abran-labs/opencode-outbox
 
 Ask your agent to draft a message. Edit the draft directly on its local card. Send it.
 
-![OpenCode chat cycling through an email invitation, a Discord DM reply design preview quoting Sam’s question, a Slack message mentioning @Maya, and an iMessage to the Friday Crew group chat](.github/assets/chat/preview.gif)
+![OpenCode chat cycling through an email invitation, a Discord DM reply design preview quoting Sam’s question, a Slack message mentioning @Maya, and an iMessage to the Friday Crew group chat](.github/assets/chat/mail-discord-slack-imessage-84586b4.gif)
 
 | Action | What it does |
 | --- | --- |
