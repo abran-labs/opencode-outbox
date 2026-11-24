@@ -4,16 +4,20 @@ const key = ({sessionID, id}) => {
   return `card/${sessionID}/${id}`;
 };
 
-export function makeCards(storage, notify) {
+export function makeCards(storage, notify, findDelivery=async()=>undefined) {
   const busy = new Set();
   async function get(ref) {
     const card = await storage.get(key(ref));
     if (!card) throw Error("Draft not found in this session.");
+    if (!card.format && !card.delivery && card.state==="draft" && /^(?:e-?mail|gmail|mail)$/i.test(card.service||"")){
+      const hint=await findDelivery();
+      if(hint)card.delivery=hint;
+    }
     return card;
   }
   async function create(sessionID, input) {
     if (!input.body?.trim() || input.body.length > maxBody) throw Error("Invalid draft body.");
-    const card = { ...input, sessionID, id:crypto.randomUUID(), revision:0, state:"draft" };
+    const card = { ...input, format:2, sessionID, id:crypto.randomUUID(), revision:0, state:"draft" };
     await storage.set(key(card),card);
     return card;
   }
@@ -32,8 +36,13 @@ export function makeCards(storage, notify) {
       } else {
         if (typeof ref.body !== "string" || ref.body.length > maxBody) throw Error("Invalid body.");
         card.body = ref.body;
+        for (const field of ["subject","from","to","cc","bcc"]) {
+          if (!Object.hasOwn(ref,field)) continue;
+          if (typeof ref[field]!=="string" || ref[field].length>1024) throw Error("Invalid message field.");
+          card[field]=ref[field];
+        }
         if (ref.action === "send") {
-          if (!card.delivery || !card.to || !card.body.trim()) throw Error("No deliverable message.");
+          if (!card.delivery || !card.to?.trim() || !card.body.trim()) throw Error("No deliverable message.");
           // Persist a non-retryable state before admission; a crash must never duplicate the request.
           card.state = "unconfirmed";
           await storage.set(k,card);
