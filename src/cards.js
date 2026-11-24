@@ -94,10 +94,12 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
       } finally { ruleBusy.delete(globalKey); }
     });
   }
-  async function change(ref) {
+  const change=ref=>applyChange(ref,false);
+  async function applyChange(ref,move) {
     return withDraft(ref,async(card,k)=>{
       if (ref.revision !== card.revision) throw Error("Draft changed. Reload the card before continuing.");
       card.revision++;
+      if(move)card.position=(card.position||0)+1;
       if (ref.action === "discard") {
         card.state = "discarded";
         card.body = "";
@@ -134,7 +136,7 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
         throw Error("Text does not match exactly once in the current draft. Leave the original card in place.");
       body=body.slice(0,at)+ref.new_text+body.slice(at+ref.old_text.length);
     } else if(!["subject","from","to","cc","bcc"].some(k=>Object.hasOwn(ref,k)))throw Error("No edit specified.");
-    return change({...ref,action:"edit",revision:card.revision,body});
+    return applyChange({...ref,action:"edit",revision:card.revision,body},true);
   }
   async function report(ref) {
     const card=await load(ref);

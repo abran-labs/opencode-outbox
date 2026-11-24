@@ -19,9 +19,10 @@ test("agent edits one existing draft and preserves manual edits outside the targ
   await cards.change({...ref,revision:0,action:"edit",body:"Hi Sophie. First idea."});
   const edited=await cards.revise({...ref,old_text:"First idea.",new_text:"New idea."});
   assert.equal(edited.id,c.id);
+  assert.equal(edited.position,1);
   assert.equal(edited.body,"Hi Sophie. New idea.");
   await assert.rejects(cards.revise({...ref,old_text:"First idea.",new_text:"stale"}));
-  await cards.revise({...ref,append:"\n\nThanks!"});
+  assert.equal((await cards.revise({...ref,append:"\n\nThanks!"})).position,2);
   await assert.rejects(cards.revise({...ref,sessionID:"ses_b",append:"wrong session"}));
   assert.equal((await cards.get(ref)).body,"Hi Sophie. New idea.\n\nThanks!");
   assert.equal(rows.size,1);

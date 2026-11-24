@@ -26,24 +26,54 @@ try {
     const row=await store.create(sessionID,fields);
     await page.evaluate(({id,sessionID})=>{
       window.clean?.();
-      document.querySelector("main").replaceChildren(window.render({code:id,session:{
+      window.placement=code=>window.render({code,session:{
         id:sessionID,key:sessionID,directory:"/",server:{client:{rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule,events:{on:(_,fn)=>{window.onRevision=fn;return ()=>{delete window.onRevision;};}}})}}
-      }}));
+      }});
+      document.querySelector("main").replaceChildren(window.placement(id));
     },row);
     return row;
   }
-  const original=await mount({body:"original"});
+  const marks=new Set();
+  for(const service of ["Matrix","Signal","Facebook Messenger","Telegram","WhatsApp","Twitter / X","Instagram","Slack","Microsoft Teams","Google Chat","iMessage","LINE","WeChat","Viber","Element","Mastodon","Bluesky"]){
+    await mount({service,body:"original"});
+    const path=page.locator("header svg path");
+    assert.equal(await path.getAttribute("fill"),"currentColor",service);
+    marks.add(await path.getAttribute("d"));
+  }
+  for(const [service,title] of [["Grokbot","Grok Bot"],["Claude Cowork","Claude Code"],["ChatGPT Dots","dots"],["Meta Muse","Muse"]]){
+    await mount({service,body:"agent draft"});
+    const path=page.locator("header svg path");
+    assert.equal(await path.getAttribute("fill"),"currentColor",service);
+    assert.equal(await page.locator("header").innerText(),title);
+    const d=await path.getAttribute("d");
+    marks.add(d);
+    await page.getByRole("button",{name:"Discard"}).click();
+    assert.equal(await page.locator(".receipt svg path").getAttribute("d"),d);
+    assert.equal(await page.locator(".receipt-label").innerText(),title);
+  }
+  assert.equal(marks.size,21);
+  const original=await mount({service:"Support chat",body:"original"});
+  assert.equal(await page.locator("header").innerText(),"Support chat");
+  assert.equal(await page.getByRole("button",{name:"Send",exact:true}).count(),0);
   await page.getByRole("textbox").waitFor();
   await store.revise({sessionID,id:original.id,append:" + correction"});
   await page.evaluate(row=>window.onRevision({data:row}),original);
+  assert.equal(await page.getByRole("textbox").count(),0);
+  await page.evaluate(id=>document.querySelector("main").append(window.placement(`${id} 1`)),original.id);
   assert.equal(await page.getByRole("textbox").inputValue(),"original + correction");
-  assert.equal(await page.locator(".oc-outbox").count(),1);
+  await store.revise({sessionID,id:original.id,append:"!"});
+  await page.evaluate(row=>window.onRevision({data:row}),original);
+  // Reopen history with all three fences. Only the newest reply owns the editor.
+  await page.evaluate(id=>document.querySelector("main").replaceChildren(...[id,`${id} 1`,`${id} 2`].map(window.placement)),original.id);
+  await page.locator("main > :last-child textarea").waitFor();
+  assert.equal(await page.getByRole("textbox").inputValue(),"original + correction!");
+  assert.equal(await page.locator(".oc-outbox:visible").count(),1);
   await page.getByRole("textbox").fill("edited copy");
   await page.getByRole("button",{name:"Copy",exact:true}).click();
   await page.getByRole("button",{name:"Copied",exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>window.copied),"edited copy");
   await page.getByRole("button",{name:"Discard"}).click();
-  await page.getByText("Message · Discarded").waitFor();
+  await page.getByText("Support chat Discarded",{exact:true}).waitFor({timeout:2000});
   const discord=await mount({body:"original",from:"Sender (@sender) (123456789012345678)",to:"Fixture (@fixture) (223456789012345678)",service:"Discord",delivery:"recording.record"});
   assert.equal(await page.getByLabel("From",{exact:true}).inputValue(),"Sender (@sender)");
   assert.equal(await page.getByLabel("To",{exact:true}).inputValue(),"Fixture (@fixture)");
@@ -54,7 +84,8 @@ try {
   assert.equal(await page.locator("header svg path").getAttribute("fill"),"currentColor");
   await store.report({...discord,outcome:"sent"});
   await page.evaluate(row=>window.onRevision({data:row}),discord);
-  await page.getByText("Discord · Sent · Fixture (@fixture)",{exact:true}).waitFor();
+  await page.getByText("Discord Sent · Fixture (@fixture)",{exact:true}).waitFor();
+  assert.equal(await page.locator(".oc-outbox svg path").getAttribute("fill"),"currentColor");
   assert.equal(JSON.parse(notices[0].text.split("\n").at(-1)).to,discord.to);
   assert.equal(JSON.parse(notices[0].text.split("\n").at(-1)).body,"edited send");
   await mount({body:"Mail draft",service:"Mail",delivery:"test.send_mail"});
