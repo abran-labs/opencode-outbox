@@ -25,14 +25,58 @@ const sheets = `
 .oc-outbox .editor:hover .editor-actions,.oc-outbox .editor-actions:has(:focus-visible),.oc-outbox .editor-actions:has(.rewrite[data-feedback]){opacity:1;pointer-events:auto}
 @media(hover:none){.oc-outbox .editor-actions{opacity:1;pointer-events:auto}}
 .oc-outbox .editor-actions[hidden]{display:none}
-.oc-outbox .media-grid{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.oc-outbox .media-grid:empty{display:none}
-.oc-outbox .media-item{width:min(144px,100%);min-width:0;margin:0}.oc-outbox .media-tile{height:92px;position:relative;background:var(--wash);border-radius:9px;overflow:hidden;display:grid;place-items:center}
-.oc-outbox .media-tile img{width:100%;height:100%;object-fit:cover}.oc-outbox .media-tile button{position:absolute;right:4px;top:4px;background:#151515d9;color:white;border:0;width:24px;height:24px;line-height:1;padding:0}
-.oc-outbox .bytes,.oc-outbox .duration{position:absolute;bottom:4px;background:#101010df;color:#ddd;border-radius:4px;font:500 11px/1.5 system-ui;padding:0 5px}.oc-outbox .bytes{left:4px}.oc-outbox .duration{right:4px}
+.oc-outbox .editor:has(.media-add,.media-item) :is(textarea,.mention-text){min-height:2.8em}
+.oc-outbox .media-grid{grid-column:1/-1;display:grid;gap:8px;min-width:0;box-sizing:border-box;padding:0 8px 8px}.oc-outbox .media-grid:empty{display:none}
+.oc-outbox .media-row{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px;min-width:0}
+.oc-outbox .media-item,.oc-outbox .media-add{flex:none;width:min(78px,100%);min-width:0;margin:0}.oc-outbox .media-item:has([data-component="attachment-card"]){width:min(160px,100%)}
+.oc-outbox .media-tile,.oc-outbox .media-add{height:52px;border-radius:6px;display:grid;place-items:center;box-sizing:border-box}
+.oc-outbox .media-tile{position:relative;background:var(--wash)}
+.oc-outbox .media-add{align-self:flex-start;background:transparent;border:1px dashed var(--border-weak-base,#8886);padding:0;color:inherit}.oc-outbox .media-add svg{opacity:.65;pointer-events:none}
+.oc-outbox .media-tile img{position:absolute;inset:0;display:block;margin:0;padding:0;border:0;border-radius:0;width:100%;height:100%;object-fit:cover;object-position:center;cursor:inherit}
+.oc-outbox .media-tile:has(.media-photo){background:transparent}
+.oc-outbox .media-photo,.oc-outbox .media-photo img{cursor:pointer}
+.oc-outbox .media-content,.oc-outbox .media-content > *,.oc-outbox .media-photo{position:absolute;inset:0}
+.oc-outbox .media-content{overflow:hidden;border-radius:inherit}
+.oc-outbox .media-tile:has(.media-photo)::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 .5px var(--v2-border-border-base,#8885);pointer-events:none}
+.oc-outbox .media-tile:is(:hover,:focus-within) button.file-open{background:var(--wash)}
+.oc-outbox button.file-open{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:inherit;background:transparent;color:inherit;padding:6px;display:grid;align-content:center;justify-items:center;gap:4px;font:inherit}
+.oc-outbox button.file-open[data-component="attachment-card"]{display:flex;flex-direction:column;align-items:stretch;padding:8px;gap:6px;text-align:start;min-width:0;max-width:100%;background:var(--v2-overlay-simple-overlay-hover,var(--wash))}
+.oc-outbox .media-tile:has([data-component="attachment-card"]){background:transparent}
+.oc-outbox .media-tile:is(:hover,:focus-within) button.file-open[data-component="attachment-card"]{background:var(--v2-overlay-simple-overlay-hover,var(--wash));box-shadow:inset 0 0 0 1px var(--v2-border-border-strong,#8887)}
+.oc-outbox .media-photo img:not([src]){opacity:0}.oc-outbox .media-photo p{margin:0}
+.oc-outbox button.media-remove,.oc-outbox button.media-remove:hover:not(:disabled){position:absolute;inset-block-start:-4px;inset-inline-end:-4px;z-index:1;display:grid;place-items:center;background:var(--v2-icon-icon-muted,#888);color:var(--v2-icon-icon-contrast,#fff);outline:1px solid currentColor;border:0;border-radius:50%;box-sizing:border-box;width:16px;height:16px;padding:0}
+.oc-outbox .media-remove{opacity:0;pointer-events:none;transition:opacity .15s}
+.oc-outbox .media-tile:hover .media-remove,.oc-outbox .media-remove:focus-visible{opacity:1;pointer-events:auto}
+.oc-outbox .media-remove svg{width:12px;height:12px}
+@media(hover:none){.oc-outbox .media-remove{opacity:1;pointer-events:auto}}
+@media(prefers-reduced-motion:reduce){.oc-outbox .media-remove{transition:none}}
+.oc-outbox .bytes,.oc-outbox .duration{position:absolute;bottom:4px;background:#101010df;color:#ddd;border-radius:4px;font:500 11px/1.5 system-ui;padding:0 5px;pointer-events:none}.oc-outbox .bytes{left:4px}.oc-outbox .duration{right:4px}
+.oc-outbox .media-tile:has([data-component="attachment-card"]) .bytes{left:auto;right:4px}
+.oc-outbox .media-tile:has([data-component="attachment-card"]) .duration{bottom:auto;top:4px;right:auto;left:4px}
+.oc-outbox .batch-warning{justify-self:start;color:#ff9a9a;background:#101010df;border-radius:4px;font-size:11px;padding:1px 5px}
+.oc-outbox .bytes:not(.over){opacity:0;pointer-events:none}.oc-outbox .media-tile:hover .bytes,.oc-outbox .media-tile:focus-within .bytes{opacity:1}
 .oc-outbox .bytes.over{color:#ff9a9a}.oc-outbox .media-error{font-size:12px;color:var(--text-danger-base,#df6a64);overflow-wrap:anywhere}
-.oc-outbox figcaption{font-size:12px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:3px}.oc-outbox .attach{margin-inline-end:auto;font-size:13px;white-space:nowrap}
 .oc-outbox .reply-line{font-size:13px;opacity:.85}.oc-outbox .reply-line q{display:block;border-left:2px solid #8887;padding-left:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.oc-outbox .reply-line input{width:auto}.oc-outbox.drop-target{outline:2px dashed currentColor}
+.oc-outbox .reply-line input{width:auto}.oc-outbox{position:relative;isolation:isolate}.oc-outbox.drop-target{outline:2px dashed currentColor}
+.oc-outbox .draft-drop{display:grid;visibility:hidden;opacity:0;transition:opacity 140ms ease-out,visibility 0s 140ms;pointer-events:none;position:absolute;inset:0;z-index:4;overflow:hidden;border-radius:inherit;place-items:center;color:var(--v2-text-text-base,inherit);background:color-mix(in srgb,currentColor var(--wash-percent),transparent);--wash-percent:4%;--stripe-percent:7%;--arrow-bg:var(--v2-background-bg-base,#fff);--drop-ease:cubic-bezier(.215,.61,.355,1)}
+[data-color-scheme="dark"] .oc-outbox .draft-drop{--wash-percent:6%;--stripe-percent:14%;--arrow-bg:var(--v2-background-bg-layer-01,#292929)}
+.oc-outbox.drop-target .draft-drop{visibility:visible;opacity:1;transition-delay:0s}
+.oc-outbox.drop-target.drop-handoff .draft-drop{transition:none}
+.oc-outbox.drop-handoff :is(.drop-prompt,.drop-arrow){animation:none}
+.oc-outbox .draft-drop::before,.oc-outbox .draft-drop::after,.oc-outbox .drop-stripe-mask,.oc-outbox .drop-stripes{position:absolute;inset:0}
+.oc-outbox .draft-drop::before{content:"";backdrop-filter:blur(1.5px);mask-image:linear-gradient(to right,transparent,#000 25%,#000 75%,transparent),linear-gradient(to bottom,transparent,#000 28%,#000 72%,transparent);mask-composite:intersect}
+.oc-outbox .draft-drop::after{content:"";background:color-mix(in srgb,var(--v2-background-bg-base,#242424) 25%,transparent);z-index:-1}
+.oc-outbox .drop-stripe-mask{mask-image:linear-gradient(to right,transparent,#000 12%,#000 88%,transparent)}
+.oc-outbox .drop-stripes{opacity:.6;background-image:repeating-linear-gradient(135deg,transparent 0 12px,color-mix(in srgb,currentColor var(--stripe-percent),transparent) 12px 24px);mask-image:radial-gradient(ellipse 59% 40% at center,#000,rgba(0,0,0,.72) 58%,transparent);animation:session-dropzone-stripes-drift 3s linear infinite}
+.oc-outbox .drop-prompt{position:relative;display:flex;flex-direction:column;align-items:center;gap:20px;text-align:center;font-size:15px;font-weight:530;line-height:24px;animation:session-dropzone-content-enter 200ms var(--drop-ease)}
+.oc-outbox .drop-arrow{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--arrow-bg);color:var(--v2-icon-icon-muted,currentColor);box-shadow:var(--v2-elevation-floating,0 3px 12px #0003);animation:session-dropzone-upload-enter 240ms var(--drop-ease)}
+.oc-outbox .drop-arrow svg{width:16px;height:16px}
+.oc-outbox:not(.drop-target) .drop-stripes{animation-play-state:paused}
+:root[data-motion="reduce"] .oc-outbox .draft-drop{transition:none}
+@media(prefers-reduced-motion:reduce){.oc-outbox .draft-drop{transition:none}}
+:root[data-motion="reduce"] .oc-outbox :is(.draft-drop,.drop-prompt,.drop-arrow,.drop-stripes){animation:none}
+@media(prefers-reduced-motion:reduce){.oc-outbox.drop-target :is(.draft-drop,.drop-prompt,.drop-arrow,.drop-stripes){animation:none}}
+body:has(.oc-outbox.drop-target) :is([data-component="session-dropzone"],[data-slot="session-dropzone-blur"]){visibility:hidden}
 .oc-outbox footer{position:relative}.oc-outbox .split{display:inline-flex;border-radius:24px;background:var(--text-strong,#eee);color:var(--background-base,#222);overflow:hidden}
 .oc-outbox .split button{background:transparent;color:inherit;border-radius:0}.oc-outbox button:hover:not(:disabled){background:var(--wash)}
 .oc-outbox .menu{position:absolute;bottom:calc(100% + 5px);right:0;z-index:3;background:var(--surface-base,#242424);border:1px solid #8885;border-radius:10px;padding:4px;box-shadow:0 4px 16px #0003}
@@ -116,14 +160,14 @@ function icon(name){
     p.setAttribute("d","M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z");
     svg.append(p);return svg;
   }
-  p.setAttribute("d",{mail:"M3 5h18v14H3z M3 6l9 7 9-7",chat:"M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-6 3v-3a2 2 0 0 1-1-2V6a2 2 0 0 1 2-2z",rewrite:"M20 10a8 8 0 1 0-.8 6M20 4v6h-6",copy:"M9 8h11v13H9z M15 8V3H4v13h5",check:"m4 12 5 5L20 6",arrow:"m7 10 5 5 5-5"}[name]);
+  p.setAttribute("d",{plus:"M12 5v14M5 12h14",mail:"M3 5h18v14H3z M3 6l9 7 9-7",chat:"M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-6 3v-3a2 2 0 0 1-1-2V6a2 2 0 0 1 2-2z",rewrite:"M20 10a8 8 0 1 0-.8 6M20 4v6h-6",copy:"M9 8h11v13H9z M15 8V3H4v13h5",check:"m4 12 5 5L20 6",arrow:"m7 10 5 5 5-5"}[name]);
   for(const [k,v] of Object.entries({fill:"none",stroke:"currentColor","stroke-width":"1.7","stroke-linecap":"round","stroke-linejoin":"round"}))p.setAttribute(k,v);
   svg.append(p);return svg;
 }
 
 function renderCard(ctx, session, id, position) {
   const owner=getOwner();
-  let disposeActions;
+  let disposeActions;const mediaRoots=[];
   const ref={id,sessionID:session.id}, opt={location:{directory:session.directory}};
   const rpc=()=>session.server.client.rpc(contract);
   const root=node("section",undefined,"oc-outbox");
@@ -154,8 +198,9 @@ function renderCard(ctx, session, id, position) {
   }
   function draw(){
     if(closed)return;
-    root.ondragover=root.ondragleave=root.ondrop=root.onpaste=null;root.classList.remove("drop-target");
+    root.ondragenter=root.ondragover=root.ondragleave=root.ondrop=root.onpaste=null;root.classList.remove("drop-target");
     disposeActions?.();disposeActions=undefined;
+    for(const dispose of mediaRoots.splice(0))dispose();
     root.replaceChildren(node("style",sheets));
     if(!card){root.append(status);return;}
     root.hidden=position!==(card.position||0);
@@ -213,8 +258,8 @@ function renderCard(ctx, session, id, position) {
       preview.onclick=()=>input.focus();
       editor.append(preview);refreshMentions=paint;paint();
     }
-    const copyHint=card.attachments?.length?"Copy text":"Copy";
-    const rewrite=node("button",undefined,"rewrite"),[rewriteLabel,setRewriteLabel]=createSignal("Rewrite"),[copyLabel,setCopyLabel]=createSignal(copyHint);
+    const copyHint=()=>card.attachments?.length?"Copy text":"Copy";
+    const rewrite=node("button",undefined,"rewrite"),[rewriteLabel,setRewriteLabel]=createSignal("Rewrite"),[copyLabel,setCopyLabel]=createSignal(copyHint());
     rewrite.append(icon("rewrite"));rewrite.setAttribute("aria-label","Rewrite");
     copy.append(icon("copy"));
     copy.setAttribute("aria-label","Copy message");
@@ -222,7 +267,7 @@ function renderCard(ctx, session, id, position) {
     arrow.append(icon("arrow"));
     arrow.setAttribute("aria-label","Send options");arrow.setAttribute("aria-expanded","false");menu.hidden=true;
     const enabled=()=>{rewrite.disabled=busy||!input.value.trim();primary.disabled=busy||(!input.value.trim()&&!(send&&card.attachments?.length))||(send&&Object.keys(card.media_warnings||{}).length>0);
-      primary.title=Object.values(card.media_warnings||{})[0]||(send&&!fields.to?.value.trim()?"Enter a recipient to send":"");};
+      primary.title=send&&!fields.to?.value.trim()?"Enter a recipient to send":"";};
     function edited(){
       dirty=true;status.textContent="";enabled();clearTimeout(timer);
       timer=setTimeout(()=>commit("edit",snapshot()).catch(()=>{}),200);
@@ -273,7 +318,7 @@ function renderCard(ctx, session, id, position) {
       try{
         if(action==="copy"){
           await ctx.system.copy(values.body);copy.replaceChildren(icon("check"));copy.setAttribute("aria-label","Copied");setCopyLabel("Copied");
-          clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.setAttribute("aria-label","Copy message");setCopyLabel(copyHint);},1600);
+          clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.setAttribute("aria-label","Copy message");setCopyLabel(copyHint());},1600);
           await commit("edit",values);
         } else {await commit(action,values);draw();}
       }catch(e){error(e);}
@@ -316,9 +361,10 @@ function renderCard(ctx, session, id, position) {
     };
     const actions=node("div",undefined,"editor-actions");
     disposeActions=render(()=>[ctx.ui.Tooltip({get value(){return rewriteLabel();},children:rewrite}),ctx.ui.Tooltip({get value(){return copyLabel();},children:copy})],actions,undefined,{owner});
-    const grid=node("div",undefined,"media-grid"),picker=node("input"),attach=node("button","＋ Media","attach");
-    picker.type="file";picker.multiple=true;picker.accept="image/*,video/*";picker.hidden=true;picker.setAttribute("aria-label","Choose images or videos");
-    attach.setAttribute("aria-label","Add images or videos");attach.title="Add images or videos · drop or paste files here";
+    const grid=node("div",undefined,"media-grid"),picker=node("input"),attach=node("button",undefined,"media-add");
+    attach.type="button";attach.append(icon("plus"));
+    picker.type="file";picker.multiple=true;picker.hidden=true;picker.setAttribute("aria-label","Choose files");
+    attach.setAttribute("aria-label","Add attachments");attach.title="Add attachments · drop or paste files here";
     attach.onclick=()=>{if(!busy)picker.click();};
     async function mediaChange(fn){
       if(busy||card.state!=="draft")return;
@@ -326,15 +372,21 @@ function renderCard(ctx, session, id, position) {
       try{
         status.textContent="";await commit("edit",snapshot());await fn();
       }catch(e){error(e);}
-      finally{busy=false;root.inert=false;if(!closed){draw();window.dispatchEvent(new CustomEvent(channel,{detail:card}));}}
+      finally{
+        busy=false;root.inert=false;
+        if(!closed){
+          if(root.contains(grid)){syncMedia();enabled();setCopyLabel(copyHint());root.removeAttribute("aria-busy");}
+          window.dispatchEvent(new CustomEvent(channel,{detail:card}));
+        }
+      }
     }
     async function addFiles(files){
       if(!files.length)return;
       await mediaChange(async()=>{
         for(const file of files){
           const r={...ref,revision:card.revision};let upload_id;
+          const progress=setTimeout(()=>{if(!closed)status.textContent=`Adding ${file.name}…`;},250);
           try{
-            status.textContent=`Adding ${file.name}…`;
             ({upload_id}=await rpc().upload({...r,name:file.name,total:file.size},opt));
             for(let offset=0;offset<file.size;offset+=192*1024){
               const buf=new Uint8Array(await file.slice(offset,offset+192*1024).arrayBuffer());let binary="";
@@ -342,26 +394,90 @@ function renderCard(ctx, session, id, position) {
               const result=await rpc().upload({...r,upload_id,offset,data:btoa(binary)},opt);
               if(result.card){card=result.card;upload_id=undefined;}
             }
-          }finally{if(upload_id)await rpc().upload({...r,upload_id,cancel:true},opt).catch(()=>{});}
+           }finally{clearTimeout(progress);if(upload_id)await rpc().upload({...r,upload_id,cancel:true},opt).catch(()=>{});}
         }
         status.textContent="";
       });
     }
-    picker.onchange=()=>addFiles([...picker.files]);root.ondragover=e=>{if(card.state==="draft"&&e.dataTransfer.types.includes("Files")){e.preventDefault();root.classList.add("drop-target");}};
-    root.ondragleave=e=>{if(!root.contains(e.relatedTarget))root.classList.remove("drop-target");};
-    root.ondrop=e=>{root.classList.remove("drop-target");if(e.dataTransfer.files.length){e.preventDefault();e.stopPropagation();addFiles([...e.dataTransfer.files]);}};
+    picker.onchange=()=>{const files=[...picker.files];picker.value="";addFiles(files);};
+    root.ondragenter=root.ondragover=e=>{
+      if(card.state!=="draft"||busy||!e.dataTransfer?.types.includes("Files"))return;
+      e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect="copy";
+      if(!root.classList.contains("drop-target")){
+        // Replace the visible chat prompt in the same paint, rather than fading up from a blank frame.
+        root.classList.toggle("drop-handoff",!!document.querySelector('[data-component="session-dropzone"]'));
+        root.classList.add("drop-target");
+        // Chat uses document dragover to show its overlay and a null-relatedTarget dragleave to clear it.
+        document.dispatchEvent(new DragEvent("dragleave",{relatedTarget:null}));
+      }
+    };
+    root.ondragleave=e=>{
+      // Native file drags can omit relatedTarget even when crossing between card children.
+      if(!root.contains(e.relatedTarget||document.elementFromPoint(e.clientX,e.clientY)))root.classList.remove("drop-target");
+    };
+    root.ondrop=e=>{root.classList.remove("drop-target");if(card.state==="draft"&&!busy&&e.dataTransfer.files.length){e.preventDefault();e.stopPropagation();addFiles([...e.dataTransfer.files]);}};
     root.onpaste=e=>{if(e.clipboardData.files.length){e.preventDefault();e.stopPropagation();addFiles([...e.clipboardData.files]);}};
-    for(const a of card.attachments||[]){
-      const fig=node("figure",undefined,"media-item"),tile=node("div",undefined,"media-tile");
-      if(a.thumbnail){const img=node("img");img.alt=a.name;img.src=a.thumbnail;tile.append(img);}
-      else tile.append(node("span",a.mime.startsWith("video/")?"Video":"Image"));
+    const tiles=new Map(),rows=[];
+    mediaRoots.push(()=>{for(const item of tiles.values())item.dispose();tiles.clear();});
+    function makeTile(a){
+      const disposers=[];
+      const fig=node("figure",undefined,"media-item"),tile=node("div",undefined,"media-tile"),content=node("div",undefined,"media-content");
+      tile.append(content);
+      let trigger;
+      if(a.file_path&&a.mime.startsWith("image/")&&/\.(?:png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(a.name)){
+        const photo=node("div",undefined,"media-photo");trigger=photo;
+        const path=a.file_path.split("/").map(encodeURIComponent).join("/");
+        const alt=a.name.replace(/[\\[\]<>`*_&]/g,ch=>"\\"+ch);
+        // Let the chat renderer own image loading, zoom, keyboard controls, and dialog cleanup.
+        disposers.push(render(()=>[ctx.ui.Markdown({text:`![${alt}](<${path}>)`})],photo,undefined,{owner}));
+      }else{
+        const open=node("button",undefined,"file-open");open.type="button";open.setAttribute("aria-label",`Open ${a.name}`);
+        // Use the host AttachmentCard slots so typography, surface and truncation follow the composer.
+        const ext=a.name.lastIndexOf(".")>0?a.name.split(".").pop().toLowerCase():"";
+        const labels={md:"Markdown",markdown:"Markdown",js:"JavaScript",ts:"TypeScript",py:"Python"};
+        const kind=a.mime==="application/pdf"?"PDF":Object.hasOwn(labels,ext)?labels[ext]:ext.toUpperCase()||"File";
+        const title=node("span",a.name),subtitle=node("span",kind);
+        open.dataset.component="attachment-card";open.dataset.clickable="true";title.dataset.slot="attachment-card-title";subtitle.dataset.slot="attachment-card-subtitle";open.append(title,subtitle);
+        open.onclick=()=>{if(!a.file_path||!ctx.links.open({href:a.file_path,session,exact:true}))error(Error("No file viewer is available for this attachment."));};trigger=open;
+      }
+      disposers.push(render(()=>[ctx.ui.Tooltip({value:a.name,placement:"top",children:trigger})],content,undefined,{owner}));
       if(a.duration){const sec=Math.round(a.duration);tile.append(node("span",`${Math.floor(sec/60)}:${String(sec%60).padStart(2,"0")}`,"duration"));}
-      const why=card.media_warnings?.[a.id],size=a.size<1024?`${a.size} B`:a.size<1024**2?`${+(a.size/1024).toFixed(1)} KiB`:`${+(a.size/1024**2).toFixed(1)} MiB`;
-      const badge=node("span",(why?"⚠ ":"")+size,why?"bytes over":"bytes");badge.title=why||`${a.size.toLocaleString()} bytes`;tile.append(badge);
-      if(card.state==="draft"){const remove=node("button","×");remove.setAttribute("aria-label",`Remove ${a.name}`);remove.onclick=()=>mediaChange(async()=>{card=await rpc().change({...ref,revision:card.revision,body:card.body,action:"edit",remove_attachments:[a.id]},opt);});tile.append(remove);}
-      fig.append(tile,node("figcaption",a.name));if(why)fig.append(node("div",why,"media-error"));grid.append(fig);
+      const size=a.size<1024?`${a.size} B`:a.size<1024**2?`${+(a.size/1024).toFixed(1)} KiB`:`${+(a.size/1024**2).toFixed(1)} MiB`;
+      const badge=node("span",size,"bytes");tile.append(badge);
+      if(card.state==="draft"){const remove=node("button",undefined,"media-remove"),cross=icon("plus");cross.style.transform="rotate(45deg)";remove.append(cross);remove.type="button";remove.setAttribute("aria-label",`Remove ${a.name}`);remove.onclick=e=>{e.stopPropagation();mediaChange(async()=>{card=await rpc().change({...ref,revision:card.revision,body:card.body,action:"edit",remove_attachments:[a.id]},opt);});};tile.append(remove);}
+      fig.append(tile);
+      return {fig,dispose(){for(const dispose of disposers)dispose();fig.remove();},warn(why){
+        badge.textContent=(why?"⚠ ":"")+size;badge.classList.toggle("over",!!why);
+        if(why)badge.setAttribute("aria-description",why);else badge.removeAttribute("aria-description");
+      }};
     }
-    editor.append(input,actions);split.append(primary);if(send)split.append(arrow);if(card.state==="draft")footer.append(attach,picker);footer.append(discard,split,menu);root.append(editor,grid,status,footer);
+    function syncMedia(){
+      const files=card.attachments||[],ids=new Set(files.map(a=>a.id));
+      for(const [id,item] of tiles)if(!ids.has(id)){item.dispose();tiles.delete(id);}
+      const items=files.map(a=>{
+        if(!tiles.has(a.id))tiles.set(a.id,makeTile(a));
+        const item=tiles.get(a.id);item.warn(card.media_warnings?.[a.id]);return item.fig;
+      });
+      if(card.state==="draft")items.push(attach);
+      items.forEach((el,i)=>{
+        const index=Math.floor(i/5);
+        if(!rows[index]){rows[index]=node("div",undefined,"media-row");grid.insertBefore(rows[index],picker);}
+        const before=rows[index].children[i%5];if(before!==el)rows[index].insertBefore(el,before||null);
+      });
+      while(rows.length>Math.ceil(items.length/5))rows.pop().remove();
+      for(const badge of grid.querySelectorAll(".batch-warning"))badge.remove();
+      for(const [key,label] of [["total","Total size"],["count","File count"]]){
+        if(card.media_warnings?.[key]){const badge=node("span",`⚠ ${label}`,"batch-warning");badge.setAttribute("aria-description",card.media_warnings[key]);grid.append(badge);}
+      }
+    }
+    grid.append(picker);syncMedia();
+    editor.append(input,actions,grid);split.append(primary);if(send)split.append(arrow);footer.append(discard,split,menu);root.append(editor,status,footer);
+    if(card.state==="draft"){
+      const overlay=node("div",undefined,"draft-drop"),mask=node("div",undefined,"drop-stripe-mask"),prompt=node("div",undefined,"drop-prompt"),arrowIcon=node("div",undefined,"drop-arrow");
+      mask.append(node("div",undefined,"drop-stripes"));arrowIcon.setAttribute("aria-hidden","true");
+      mediaRoots.push(render(()=>[ctx.ui.Icon({name:"arrow-up",size:"normal"})],arrowIcon,undefined,{owner}));
+      prompt.append(arrowIcon,node("span","Drop images, PDFs, or files to add"));overlay.append(mask,prompt);root.append(overlay);
+    }
     if(card.state==="sending"){
       for(const el of Object.values(fields))el.readOnly=true;
       actions.hidden=true;discard.hidden=true;arrow.hidden=true;
@@ -388,6 +504,7 @@ function renderCard(ctx, session, id, position) {
   window.addEventListener("focus",refresh);
   onCleanup(()=>{
     disposeActions?.();
+    for(const dispose of mediaRoots.splice(0))dispose();
     closed=true;stop();clearTimeout(timer);clearTimeout(feedback);clearTimeout(rewriteFeedback);window.removeEventListener(channel,update);window.removeEventListener("focus",refresh);
     if(dirty && !busy && card?.state==="draft")commit("edit",snapshot()).catch(()=>{});
   });

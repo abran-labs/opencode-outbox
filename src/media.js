@@ -1,7 +1,7 @@
 import {constants,createReadStream} from "node:fs";
 import {chmod,copyFile,mkdir,open,readFile,rm,stat} from "node:fs/promises";
 import {createHash,randomUUID} from "node:crypto";
-import {basename,join,isAbsolute} from "node:path";
+import {basename,extname,join,isAbsolute} from "node:path";
 import {homedir} from "node:os";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
@@ -20,31 +20,41 @@ function safeName(name){
 }
 export const mediaPath=(c,a)=>join(dir(c,a.id),safeName(a.name));
 export const removeMedia=(c,a)=>rm(dir(c,a.id),{recursive:true,force:true});
-function typeOf(b){
+function typeOf(b,name){
   const s=b.toString("latin1");
   if(s.startsWith("\x89PNG\r\n\x1a\n"))return ["image/png","png_pipe"];
   if(s.startsWith("\xff\xd8\xff"))return ["image/jpeg","jpeg_pipe"];
   if(/^GIF8[79]a/.test(s))return ["image/gif","gif"];
   if(s.startsWith("RIFF")&&s.slice(8,12)==="WEBP")return ["image/webp","webp_pipe"];
+  if(s.startsWith("RIFF")&&s.slice(8,12)==="WAVE")return ["audio/wav"];
+  if(s.startsWith("%PDF-"))return ["application/pdf"];
+  if(/^(?:\s|<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->)*<svg[\s>]/i.test(b.toString("utf8").replace(/^\uFEFF/,"")))return ["image/svg+xml"];
   if(s.slice(4,8)==="ftyp"){
     if(/avif|avis/.test(s.slice(8,32)))return ["image/avif","mov"];
     if(/heic|heix|heif|mif1/.test(s.slice(8,32)))return ["image/heic","mov"];
+    if(/^M4[AB] /.test(s.slice(8,12))||/\.(?:m4a|m4b)$/i.test(name))return ["audio/mp4"];
     return [s.slice(8,12)==="qt  "?"video/quicktime":"video/mp4","mov"];
   }
   if(s.startsWith("\x1a\x45\xdf\xa3"))return ["video/webm","matroska"];
-  throw Error("Choose a PNG, JPEG, GIF, WebP, AVIF, HEIC, MP4, MOV or WebM file.");
+  return [];
 }
 async function metadata(c,id,name){
   const path=mediaPath(c,{id,name}),file=await open(path,"r");let mime,format,size;
   try{size=(await file.stat()).size;if(!size||size>max)throw Error("Outbox stages files up to 1 GiB each.");
-    const head=Buffer.alloc(64);await file.read(head,0,64,0);[mime,format]=typeOf(head);
+    const head=Buffer.alloc(4096);const {bytesRead}=await file.read(head,0,head.length,0);[mime,format]=typeOf(head.subarray(0,bytesRead),name);
   }finally{await file.close();}
+  if(!mime){
+    try{const {stdout}=await exec("file",["--brief","--mime-type","--",path],{timeout:3000});mime=stdout.trim();}catch{}
+    mime||=({".svg":"image/svg+xml",".mp3":"audio/mpeg",".flac":"audio/flac",".ogg":"audio/ogg",".txt":"text/plain",".json":"application/json"})[extname(name).toLowerCase()]||"application/octet-stream";
+  }
   const hash=createHash("sha256");for await(const part of createReadStream(path))hash.update(part);
   const a={id,name,mime,size,sha256:hash.digest("hex")};
+  if(!format)return a;
   const input=["-protocol_whitelist","file","-f",format,"-i",path];
   try{
-    const {stdout}=await exec("ffmpeg",["-nostdin","-v","error","-max_alloc","134217728","-threads","1",...input,"-map","0:v:0","-frames:v","1","-vf","scale=320:200:force_original_aspect_ratio=decrease","-threads","1","-c:v","mjpeg","-f","image2pipe","pipe:1"],{encoding:"buffer",timeout:10000,maxBuffer:256*1024});
-    if(stdout.length)a.thumbnail="data:image/jpeg;base64,"+stdout.toString("base64");
+    const alpha=mime.startsWith("image/")&&mime!=="image/jpeg";
+    const {stdout}=await exec("ffmpeg",["-nostdin","-v","error","-max_alloc","134217728","-threads","1",...input,"-map","0:v:0","-frames:v","1","-vf","scale=320:200:force_original_aspect_ratio=decrease","-threads","1","-c:v",alpha?"png":"mjpeg","-f","image2pipe","pipe:1"],{encoding:"buffer",timeout:10000,maxBuffer:320*1024});
+    if(stdout.length)a.thumbnail=`data:image/${alpha?"png":"jpeg"};base64,`+stdout.toString("base64");
   }catch{if(mime.startsWith("image/")&&size<=192*1024)a.thumbnail=`data:${mime};base64,`+(await readFile(path)).toString("base64");}
   if(mime.startsWith("video/"))try{
     const {stdout}=await exec("ffprobe",["-v","error","-show_entries","format=duration","-of","csv=p=0",...input],{timeout:4000});
@@ -96,8 +106,9 @@ export function attachmentWarnings(c){
   const total=list.reduce((sum,a)=>sum+a.size,0);
   for(const a of list){
     if(limit.max_bytes&&(!limit.kind||a.mime.startsWith(limit.kind+"/"))&&a.size>limit.max_bytes)warnings[a.id]=`${a.size.toLocaleString()} bytes exceeds the ${limit.max_bytes.toLocaleString()}-byte file limit (${limit.source}).`;
-    else if(limit.total_bytes&&total>limit.total_bytes)warnings[a.id]=`Attachments total ${total.toLocaleString()} bytes; limit ${limit.total_bytes.toLocaleString()} bytes (${limit.source}).`;
-    else if(limit.max_files&&list.length>limit.max_files)warnings[a.id]=`${list.length} attachments; limit ${limit.max_files} (${limit.source}).`;
+    else if(limit.total_bytes&&a.size>limit.total_bytes)warnings[a.id]=`This file alone exceeds the ${limit.total_bytes.toLocaleString()}-byte total limit (${limit.source}).`;
   }
+  if(limit.total_bytes&&total>limit.total_bytes&&!list.some(a=>a.size>limit.total_bytes))warnings.total=`Attachments total ${total.toLocaleString()} bytes; limit ${limit.total_bytes.toLocaleString()} bytes (${limit.source}).`;
+  if(limit.max_files&&list.length>limit.max_files)warnings.count=`${list.length} attachments; limit ${limit.max_files} (${limit.source}).`;
   return warnings;
 }

@@ -25,6 +25,11 @@ function modeOf(card, policy) {
 
 export function makeCards(storage, notify, findDelivery=async()=>undefined, findAgent=async()=>undefined, findMediaLimit=async()=>undefined, strictReply=async()=>false) {
   const busy = new Set();
+  async function fillMediaLimit(card) {
+    if(card.media_limit)return;
+    const limit=await findMediaLimit(card);
+    if(limit)card.media_limit=limit;
+  }
   async function load(ref) {
     const card = await storage.get(key(ref));
     if (!card) throw Error("Draft not found in this session.");
@@ -38,7 +43,8 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
   async function view(card) {
     const global=await storage.get(globalKey);
     const local=await storage.get(ruleKey(card.agent));
-    return {...card,media_warnings:attachmentWarnings(card),mode:global===true?"global":modeOf(card,global===undefined?local:{...local,agent:false})};
+    const attachments=card.attachments?.map(a=>({...a,file_path:mediaPath(card,a)}));
+    return {...card,...(attachments?{attachments}:{}),media_warnings:attachmentWarnings(card),mode:global===true?"global":modeOf(card,global===undefined?local:{...local,agent:false})};
   }
   async function get(ref) {
     return view(await load(ref));
@@ -68,9 +74,9 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
     if (typeof body!=="string"||(!body.trim()&&!paths.length)||body.length>maxBody||paths.length>32)throw Error("Invalid draft content.");
     const card = { ...fields,body, agent:agent || (await findAgent(sessionID)) || "build", format:2, sessionID, id:crypto.randomUUID(), revision:0, state:"draft" };
     const k = key(card);
-    card.reply=normalizeReply(card.reply,card);
+    if(card.reply!==undefined)card.reply=normalizeReply(card.reply,card);
     const {mode} = await view(card);
-    card.media_limit??=await findMediaLimit(card);
+    await fillMediaLimit(card);
     if(paths.length)card.attachments=await stagePaths(card,paths);
     if (input.intent === "send" && mode !== "approval" && deliverable(card)&&!Object.keys(attachmentWarnings(card)).length&&(!card.reply||await strictReply())) {
       await requestSend(k,card,"The user explicitly requested sending, and a saved rule bypassed Outbox review");
@@ -133,7 +139,7 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
         if(move&&Object.hasOwn(ref,"reply"))card.reply=normalizeReply(ref.reply,card);
         if(card.reply&&typeof ref.ping_on_reply==="boolean")card.reply.ping_on_reply=ref.ping_on_reply;
         normalizeReply(card.reply,card);
-        card.media_limit??=await findMediaLimit(card);
+        await fillMediaLimit(card);
         if(ref.remove_attachments?.length||ref.add_attachments?.length){
           const old=card.attachments||[];
           for(const value of ref.remove_attachments||[]){
@@ -194,7 +200,7 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
       const result=await uploadPart(card,ref);
       if(!result.attachment)return result;
       card.attachments=[...(card.attachments||[]),result.attachment];card.revision++;
-      card.media_limit??=await findMediaLimit(card);
+      await fillMediaLimit(card);
       try{await storage.set(k,card);}catch(e){await purge(card,[result.attachment]);throw e;}
       return {card:await view(card)};
     });

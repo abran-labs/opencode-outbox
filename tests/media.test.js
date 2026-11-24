@@ -4,8 +4,44 @@ import {mkdtemp,readFile,writeFile,rm} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {makeCards} from "../src/cards.js";
+import {attachmentWarnings} from "../src/media.js";
+
+test("a total limit flags only files too large on their own; combined overflow belongs to the draft",()=>{
+  const card={media_limit:{total_bytes:10*1024**2,source:"fixture"},attachments:[{id:"image",size:10586318},{id:"pdf",size:61338}]};
+  assert.deepEqual(Object.keys(attachmentWarnings(card)),["image"]);
+  card.attachments[0].size=card.media_limit.total_bytes;
+  assert.deepEqual(Object.keys(attachmentWarnings(card)),["total"]);
+  card.attachments.pop();assert.deepEqual(attachmentWarnings(card),{});
+});
 
 const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNrkAAAAASUVORK5CYII=","base64");
+test("mixed file types keep their exact bytes and viewer paths",async t=>{
+  const dir=await mkdtemp(join(tmpdir(),"outbox-files-"));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const fixtures=[["brief.pdf","%PDF-1.4\n1 0 obj\n<<>>\nendobj","application/pdf"],["mark.svg",'<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>',"image/svg+xml"],["voice.wav",Buffer.from("524946462400000057415645666d74201000000001000100401f0000803e0000020010006461746100000000","hex"),"audio/wav"],["project.blob",Buffer.from([0,255,1,15]),"application/octet-stream"]];
+  for(const [name,data] of fixtures)await writeFile(join(dir,name),data);
+  const rows=new Map();const cards=makeCards({get:k=>structuredClone(rows.get(k)),set:(k,v)=>rows.set(k,structuredClone(v))},async()=>{});
+  const c=await cards.create("ses_files",{attachments:fixtures.map(([name])=>join(dir,name))});
+  t.after(()=>cards.change({...c,action:"discard"}));
+  const {attachments}=await cards.get(c);
+  for(const [i,[name,data,mime]] of fixtures.entries()){
+    const a=attachments[i];assert.equal(a.name,name);assert.equal(a.mime,mime);
+    assert.deepEqual(await readFile(a.file_path),Buffer.from(data));
+  }
+});
+test("removing media without a connector limit returns the saved draft as valid JSON",async t=>{
+  const dir=await mkdtemp(join(tmpdir(),"outbox-remove-test-"));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const path=join(dir,"photo.png");await writeFile(path,png);
+  const rows=new Map();
+  const cards=makeCards({get:k=>rows.has(k)?JSON.parse(rows.get(k)):undefined,set:(k,v)=>rows.set(k,JSON.stringify(v))},async()=>{});
+  const card=await cards.create("ses_remove",{service:"Playtest chat",body:"Caption",attachments:[path,path]});
+  const ref={id:card.id,sessionID:card.sessionID};
+  t.after(async()=>{const latest=await cards.get(ref);await cards.change({...ref,revision:latest.revision,action:"discard"});});
+  const result=await cards.change({...ref,revision:0,action:"edit",body:card.body,remove_attachments:[card.attachments[1].id]});
+  const saved=await cards.get(ref);
+  assert.deepEqual(saved.attachments.map(a=>a.id),[card.attachments[0].id]);
+  assert.deepEqual(result,JSON.parse(JSON.stringify(result)));
+  assert.deepEqual(result,saved);
+});
 test("media-only draft freezes selected bytes; edits remove files and rejection preserves the draft",async t=>{
   const dir=await mkdtemp(join(tmpdir(),"outbox-media-test-"));t.after(()=>rm(dir,{recursive:true,force:true}));
   const path=join(dir,"bridge.png");await writeFile(path,png);
