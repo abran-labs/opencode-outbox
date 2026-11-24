@@ -37,7 +37,7 @@ test("one click admission freezes the latest body; competing clicks cannot enque
   assert.equal(results.filter(x=>x.status==="fulfilled").length,1);
   assert.equal(notices.length,1);
   assert.equal(JSON.parse(notices[0].text.split("\n").at(-1)).body,args.body);
-  assert.equal((await cards.get(args)).state,"requested");
+  assert.equal((await cards.get(args)).state,"sending");
 });
 test("copy-only draft survives edits; stale revision and foreign session cannot change it",async()=>{
   const {cards,notices}=fixture();
@@ -74,7 +74,7 @@ test("recipient rule persists and uses the saved exact envelope, not the pre-edi
   assert.equal((await reload().get(ref)).mode,"recipient");
 
   const next=await reload().create("ses_b",{...envelope,intent:"send",body:"final",subject:"Subject"},"writer");
-  assert.equal(next.state,"requested");
+  assert.equal(next.state,"sending");
   assert.equal(notices[0].sessionID,"ses_b");
   assert.deepEqual(JSON.parse(notices[0].text.split("\n").at(-1)),{...envelope,body:"final",subject:"Subject"});
   assert.equal((await cards.create("ses_b",{...message,intent:"send"},"writer")).state,"draft");
@@ -111,7 +111,7 @@ test("agent mode only bypasses review for deliverable send intent; approval rest
   assert.equal((await cards.create("ses_b",{...message,intent:"draft"},"writer")).state,"draft");
   assert.equal((await cards.create("ses_b",{...message,to:"",intent:"send"},"writer")).state,"draft");
   assert.equal((await cards.create("ses_b",{...message,to:"new@example.com",intent:"send"},"other")).state,"draft");
-  assert.equal((await cards.create("ses_b",{...message,to:"new@example.com",intent:"send"},"writer")).state,"requested");
+  assert.equal((await cards.create("ses_b",{...message,to:"new@example.com",intent:"send"},"writer")).state,"sending");
   assert.equal((await cards.rule({...ref,mode:"approval"})).mode,"approval");
   assert.equal((await cards.create("ses_b",{...message,intent:"send"},"writer")).state,"draft");
   assert.equal(notices.length,1);
@@ -137,7 +137,7 @@ test("old cards use the session agent or build and pin the agent on a rule chang
     assert.equal((await cards.rule({...ref,mode:"agent"})).mode,"agent");
     agent="other";
     assert.equal((await cards.get(ref)).agent,owner);
-    assert.equal((await cards.create("ses_b",{...message,intent:"send"},owner)).state,"requested");
+    assert.equal((await cards.create("ses_b",{...message,intent:"send"},owner)).state,"sending");
   }
 });
 

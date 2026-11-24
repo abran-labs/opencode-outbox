@@ -44,10 +44,15 @@ try {
   assert.equal(await page.evaluate(()=>window.copied),"edited copy");
   await page.getByRole("button",{name:"Discard"}).click();
   await page.getByText("Message · Discarded").waitFor();
-  await mount({body:"original",to:"fixture",service:"Chat",delivery:"recording.record"});
+  const discord=await mount({body:"original",to:"fixture",service:"Discord",delivery:"recording.record"});
   await page.getByRole("textbox",{name:"Message body"}).fill("edited send");
   await page.getByRole("button",{name:"Send",exact:true}).click();
-  await page.getByText("Chat · Send requested · fixture").waitFor();
+  await page.getByRole("button",{name:"Sending",exact:true}).waitFor();
+  assert.equal(await page.getByRole("textbox",{name:"Message body"}).evaluate(el=>el.readOnly),true);
+  assert.equal(await page.locator("header svg path").getAttribute("fill"),"currentColor");
+  await store.report({...discord,outcome:"sent"});
+  await page.evaluate(row=>window.onRevision({data:row}),discord);
+  await page.getByText("Discord · Sent · fixture").waitFor();
   assert.equal(JSON.parse(notices[0].text.split("\n").at(-1)).body,"edited send");
   await mount({body:"Mail draft",service:"Mail",delivery:"test.send_mail"});
   const send=page.getByRole("button",{name:"Send",exact:true});
@@ -69,7 +74,7 @@ try {
   }
   assert.equal(notices.length,1);
   await send.click();
-  await page.getByText("Mail · Send requested · fixture@example.test").waitFor();
+  await page.getByRole("button",{name:"Sending",exact:true}).waitFor();
   const envelope=JSON.parse(notices[1].text.split("\n").at(-1));
   assert.equal(envelope.subject,"Edited subject");
   assert.equal(envelope.to,"fixture@example.test");
