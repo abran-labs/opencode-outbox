@@ -12,7 +12,11 @@ opencode plugin add github:abran-labs/opencode-outbox
 
 Ask your agent to draft a message. Edit the draft directly on its local card. Send it.
 
-![Editable Discord draft with sender, recipient, message, and Discard and Send buttons](.github/assets/outbox-draft.png)
+![OpenCode chat cycling through an email invitation, a Discord channel post, a group reply design preview, and a Telegram reminder](.github/assets/chat/preview.gif)
+
+View a still: [Email](.github/assets/chat/mail.png) · [Discord channel](.github/assets/chat/discord.png) · [Group reply (design preview)](.github/assets/chat/group-reply.png) · [Telegram](.github/assets/chat/telegram.png)
+
+In the group reply preview, **To** is the group chat, **Replying to Sam** quotes the message being answered, and **@Maya** stays in the draft itself.
 
 For a browser chat or another custom destination, ask “Draft a message for the support chat that I can copy and paste.” The card uses the destination name, a generic chat icon, and **Copy**. No messaging connector is needed.
 
