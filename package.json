@@ -1,0 +1,21 @@
+{
+  "name": "opencode-outbox",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "repository": "github:abran-labs/opencode-outbox",
+  "exports": {
+    ".": "./src/server.js",
+    "./gui-experimental": "./src/gui.cjs"
+  },
+  "files": ["src", ".github/assets", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@opencode/plugin": "2.4.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.1"
+  }
+}
