@@ -12,6 +12,10 @@ opencode plugin add github:abran-labs/opencode-outbox
 
 Ask your agent to draft a message. Edit the draft directly on its local card. Send it.
 
+![Editable Discord draft with sender, recipient, message, and Discard and Send buttons](.github/assets/outbox-draft.png)
+
+For a browser chat or another custom destination, ask “Draft a message for the support chat that I can copy and paste.” The card uses the destination name, a generic chat icon, and **Copy**. No messaging connector is needed.
+
 | Action | What it does |
 | --- | --- |
 | Send | Asks the agent to deliver your exact draft through its usual messaging MCP. (e.g. https://github.com/taylorwilsdon/google_workspace_mcp) |
