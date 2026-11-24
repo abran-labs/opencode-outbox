@@ -27,7 +27,7 @@ try {
     await page.evaluate(({id,sessionID})=>{
       window.clean?.();
       window.placement=code=>window.render({code,session:{
-        id:sessionID,key:sessionID,directory:"/",server:{client:{session:{prompt:async req=>{(window.rewrites??=[]).push(req);}},rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule,events:{on:(_,fn)=>{window.onRevision=fn;return ()=>{delete window.onRevision;};}}})}}
+        id:sessionID,key:sessionID,directory:"/",server:{client:{session:{generate:req=>new Promise((resolve,reject)=>{window.rewriteRequest=req;window.finishRewrite=text=>resolve({text});window.failRewrite=()=>reject(Error("Model unavailable"));})},rpc:()=>({get:window.fetchDraft,change:window.changeDraft,rule:window.setRule,events:{on:(_,fn)=>{window.onRevision=fn;return ()=>{delete window.onRevision;};}}})}}
       }});
       document.querySelector("main").replaceChildren(window.placement(id));
     },row);
@@ -67,13 +67,30 @@ try {
     const body=service==="Mail"?"Unsent manual edit":"Original wording";
     if(service==="Mail")await page.getByLabel("Message body").fill(body);
     await rewrite.click();
-    await page.getByRole("status").getByText("Rewrite requested.").waitFor();
-    const req=await page.evaluate(()=>window.rewrites.at(-1));
+    await page.getByRole("button",{name:"Rewriting"}).waitFor({timeout:2000});
+    await page.mouse.move(0,0);
+    assert.equal(await actions.evaluate(el=>getComputedStyle(el).opacity),"1");
+    await page.waitForFunction(()=>!!window.finishRewrite);
+    const req=await page.evaluate(()=>window.rewriteRequest);
     assert.equal(req.sessionID,sessionID);
-    assert.ok(req.text.includes(row.id)&&req.text.includes(JSON.stringify(body))&&req.text.includes("edit_message_card"));
-    assert.equal((await store.get(row)).body,body);
+    assert.ok(req.prompt.includes(JSON.stringify(body)));
+    await page.evaluate(()=>{window.finishRewrite("Rewritten wording");delete window.finishRewrite;});
+    await page.getByRole("button",{name:"Rewritten"}).waitFor();
+    assert.equal(await page.getByRole("status",{includeHidden:true}).textContent(),"");
+    assert.equal(await page.getByLabel("Message body").inputValue(),"Rewritten wording");
+    const saved=await store.get(row);
+    assert.equal(saved.body,"Rewritten wording");assert.equal(saved.position,row.position);
     assert.equal(notices.length,0);
   }
+  const concurrent=await mount({body:"First",service:"Chat"});
+  await page.getByLabel("Message body").hover();
+  await page.getByRole("button",{name:"Rewrite",exact:true}).click();
+  await page.waitForFunction(()=>!!window.finishRewrite);
+  await store.change({...concurrent,action:"edit",body:"Newer edit in another window"});
+  await page.evaluate(()=>window.finishRewrite("Stale rewrite"));
+  await page.getByText(/Draft changed\. Reload/).waitFor();
+  assert.equal((await store.get(concurrent)).body,"Newer edit in another window");
+  assert.ok(await page.getByRole("button",{name:"Rewrite",exact:true}).isEnabled());
   const original=await mount({service:"Support chat",body:"original"});
   assert.equal(await page.locator("header").innerText(),"Support chat");
   assert.equal(await page.getByRole("button",{name:"Send",exact:true}).count(),0);

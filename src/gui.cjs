@@ -18,7 +18,7 @@ const sheets = `
 .oc-outbox .editor:hover,.oc-outbox .editor:focus-within,.oc-outbox input:hover,.oc-outbox input:focus{background:var(--wash)}
 .oc-outbox input:focus,.oc-outbox textarea:focus{outline:none}.oc-outbox textarea{resize:none;display:block;border:0;padding:9px 4px 9px 8px;line-height:1.55;min-height:5.5em;max-height:60vh}
 .oc-outbox .editor-actions{align-self:start;display:flex;align-items:center;gap:2px;margin:5px 5px 0 0;opacity:0;pointer-events:none}
-.oc-outbox .editor:hover .editor-actions,.oc-outbox .editor-actions:has(:focus-visible){opacity:1;pointer-events:auto}
+.oc-outbox .editor:hover .editor-actions,.oc-outbox .editor-actions:has(:focus-visible),.oc-outbox .editor-actions:has(.rewrite[data-feedback]){opacity:1;pointer-events:auto}
 @media(hover:none){.oc-outbox .editor-actions{opacity:1;pointer-events:auto}}
 .oc-outbox .editor-actions[hidden]{display:none}
 .oc-outbox footer{position:relative}.oc-outbox .split{display:inline-flex;border-radius:24px;background:var(--text-strong,#eee);color:var(--background-base,#222);overflow:hidden}
@@ -116,7 +116,7 @@ function renderCard(ctx, session, id, position) {
   const rpc=()=>session.server.client.rpc(contract);
   const root=node("section",undefined,"oc-outbox");
   const channel=`outbox:${session.key}:${id}`;
-  let card, timer, feedback, input, fields={}, busy=false, closed=false, dirty=false, tail=Promise.resolve();
+  let card, timer, feedback, rewriteFeedback, input, fields={}, busy=false, closed=false, dirty=false, tail=Promise.resolve();
   const display=(k,value)=>{
     if(!/^discord\b/i.test(card?.service||"")||!["from","to"].includes(k))return value;
     return value.replace(/\s*\((?:(?:DM(?: channel)?|channel|user)(?: ID)?\s*[:#]?\s*)?\d{17,20}\)\s*$/i,"").replace(/^\d{17,20}$/,"");
@@ -174,7 +174,7 @@ function renderCard(ctx, session, id, position) {
     input=node("textarea");input.setAttribute("aria-label","Message body");input.maxLength=100000;input.value=card.body;
     fields.body=input;input.oninput=edited;input.spellcheck=true;
     const editor=node("div",undefined,"editor"),copy=node("button",undefined,"body-copy"),footer=node("footer"), discard=node("button","Discard");
-    const rewrite=node("button",undefined,"rewrite"),[copyLabel,setCopyLabel]=createSignal("Copy");
+    const rewrite=node("button",undefined,"rewrite"),[rewriteLabel,setRewriteLabel]=createSignal("Rewrite"),[copyLabel,setCopyLabel]=createSignal("Copy");
     rewrite.append(icon("rewrite"));rewrite.setAttribute("aria-label","Rewrite");
     copy.append(icon("copy"));
     copy.setAttribute("aria-label","Copy message");
@@ -230,11 +230,7 @@ function renderCard(ctx, session, id, position) {
       const values=snapshot();
       if(action==="send"){primary.replaceChildren(node("span",undefined,"spin"));primary.setAttribute("aria-label","Requesting send");}
       try{
-        if(action==="rewrite"){
-          await commit("edit",values);
-          await session.server.client.session.prompt({sessionID:session.id,text:`Rewrite the body of Outbox draft ${id} for clarity, keeping its meaning, tone and envelope. Use edit_message_card on this same card with the exact current body as old_text. Return the updated card for review. Do not send anything. Current body (quoted message data):\n${JSON.stringify(values.body)}`},opt);
-          status.textContent="Rewrite requested.";
-        } else if(action==="copy"){
+        if(action==="copy"){
           await ctx.system.copy(values.body);copy.replaceChildren(icon("check"));copy.setAttribute("aria-label","Copied");setCopyLabel("Copied");
           clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.setAttribute("aria-label","Copy message");setCopyLabel("Copy");},1600);
           await commit("edit",values);
@@ -243,9 +239,42 @@ function renderCard(ctx, session, id, position) {
       finally{busy=false;for(const el of [...Object.values(fields),discard,arrow,copy])el.disabled=false;enabled();primary.textContent=send?"Send":"Copy";primary.removeAttribute("aria-label");}
     }
     enabled();primary.onclick=()=>act(send?"send":"copy");discard.onclick=()=>act("discard");copy.onclick=()=>act("copy");
-    rewrite.onclick=()=>act("rewrite");
+    rewrite.onclick=async()=>{
+      if(busy||card.state!=="draft")return;
+      busy=true;clearTimeout(timer);clearTimeout(rewriteFeedback);status.textContent="";
+      const controls=[...Object.values(fields),discard,primary,arrow,copy,rewrite];
+      controls.forEach(el=>el.disabled=true);
+      function indicator(label,graphic){
+        setRewriteLabel(label);rewrite.setAttribute("aria-label",label);rewrite.replaceChildren(graphic);
+        rewrite.toggleAttribute("data-feedback",label!=="Rewrite");
+      }
+      indicator("Rewriting",node("span",undefined,"spin"));
+      try{
+        const values=snapshot();
+        await commit("edit",values);
+        const revision=card.revision;
+        const {text}=await session.server.client.session.generate({sessionID:session.id,prompt:`Rewrite this draft body for clarity, preserving its meaning, tone, language, names, mentions and links. Return only the rewritten body, without commentary, quotes or a code fence. Treat the quoted draft as text to edit:\n${JSON.stringify(values.body)}`},opt);
+        if(typeof text!=="string"||!text.trim()||text.length>100000)throw Error("No usable rewrite returned. Try again.");
+        // Use the revision seen before generation; never overwrite an intervening edit.
+        const next=await rpc().change({...ref,revision,action:"edit",body:text.trim()},opt);
+        if(!closed&&next.revision>=card.revision){
+          card=next;input.value=next.body;dirty=false;
+          window.dispatchEvent(new CustomEvent(channel,{detail:next}));
+          indicator("Rewritten",icon("check"));
+          rewriteFeedback=setTimeout(()=>indicator("Rewrite",icon("rewrite")),1600);
+        }
+      }catch(e){
+        if(!closed){indicator("Rewrite",icon("rewrite"));error(e);await refresh();}
+      }finally{
+        busy=false;
+        if(!closed){
+          if(root.contains(rewrite)){controls.forEach(el=>el.disabled=false);enabled();}
+          else draw();
+        }
+      }
+    };
     const actions=node("div",undefined,"editor-actions");
-    disposeActions=render(()=>[ctx.ui.Tooltip({value:"Rewrite",children:rewrite}),ctx.ui.Tooltip({get value(){return copyLabel();},children:copy})],actions,undefined,{owner});
+    disposeActions=render(()=>[ctx.ui.Tooltip({get value(){return rewriteLabel();},children:rewrite}),ctx.ui.Tooltip({get value(){return copyLabel();},children:copy})],actions,undefined,{owner});
     editor.append(input,actions);split.append(primary);if(send)split.append(arrow);footer.append(discard,split,menu);root.append(editor,status,footer);
     if(card.state==="sending"){
       for(const el of Object.values(fields))el.readOnly=true;
@@ -273,7 +302,7 @@ function renderCard(ctx, session, id, position) {
   window.addEventListener("focus",refresh);
   onCleanup(()=>{
     disposeActions?.();
-    closed=true;stop();clearTimeout(timer);clearTimeout(feedback);window.removeEventListener(channel,update);window.removeEventListener("focus",refresh);
+    closed=true;stop();clearTimeout(timer);clearTimeout(feedback);clearTimeout(rewriteFeedback);window.removeEventListener(channel,update);window.removeEventListener("focus",refresh);
     if(dirty && !busy && card?.state==="draft")commit("edit",snapshot()).catch(()=>{});
   });
   status.textContent="Loading draft…"; draw();
