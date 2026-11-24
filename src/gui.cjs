@@ -15,6 +15,10 @@ const sheets = `
 .oc-outbox input{background:transparent;color:inherit;min-width:0;width:100%;border:0;border-radius:6px;padding:5px;font:inherit}
 .oc-outbox input.subject{font-weight:600}.oc-outbox .editor{position:relative;border-radius:8px;margin:7px 0}
 .oc-outbox .editor:hover,.oc-outbox .editor:focus-within,.oc-outbox input:hover,.oc-outbox input:focus{background:var(--wash)}
+.oc-outbox .mention-text{white-space:pre-wrap;overflow-wrap:anywhere;padding:9px 40px 9px 8px;line-height:1.55;min-height:5.5em;box-sizing:border-box;cursor:text}
+.oc-outbox .editor:has(.mention-text:not([hidden])) textarea{position:absolute;inset:0;height:100%;opacity:0;pointer-events:none}
+.oc-outbox .mention-text mark{background:#dcecf6;color:#12618b;border-radius:4px;padding:0 2px}
+@media(prefers-color-scheme:dark){.oc-outbox .mention-text mark{background:#183e52;color:#85d4ff}}
 .oc-outbox input:focus,.oc-outbox textarea:focus{outline:none}.oc-outbox textarea{resize:none;display:block;border:0;padding:9px 40px 9px 8px;line-height:1.55;min-height:5.5em;max-height:60vh}
 .oc-outbox .body-copy{position:absolute;right:5px;top:5px;padding:4px 6px;border-radius:5px;opacity:0}
 .oc-outbox .editor:hover .body-copy,.oc-outbox .editor:focus-within .body-copy,.oc-outbox .body-copy.copied{opacity:1}
@@ -169,6 +173,22 @@ function renderCard(ctx, session, id, position) {
     input=node("textarea");input.setAttribute("aria-label","Message body");input.maxLength=100000;input.value=card.body;
     fields.body=input;input.oninput=edited;input.spellcheck=true;
     const editor=node("div",undefined,"editor"),copy=node("button",undefined,"body-copy"),footer=node("footer"), discard=node("button","Discard");
+    if(mark==="slack" && card.slack_mentions?.length){
+      const labels=new Map(card.slack_mentions.map(({id,name})=>[id,name])),preview=node("div",undefined,"mention-text");
+      preview.setAttribute("aria-hidden","true");
+      function paint(){
+        preview.replaceChildren();let end=0;
+        for(const match of input.value.matchAll(/<@([UW][A-Z0-9]+)>/g)){
+          const name=labels.get(match[1]);if(!name)continue;
+          preview.append(input.value.slice(end,match.index),node("mark","@"+name.replace(/^@/,"")));
+          end=match.index+match[0].length;
+        }
+        preview.append(input.value.slice(end));preview.hidden=!end||document.activeElement===input;
+      }
+      input.onfocus=()=>{preview.hidden=true;};input.onblur=paint;
+      preview.onclick=()=>input.focus();
+      editor.append(preview);paint();
+    }
     copy.append(icon("copy"));
     copy.setAttribute("aria-label","Copy message");copy.title="Copy message";
     const split=node("div",undefined,"split"),primary=node("button",send?"Send":"Copy"),arrow=node("button"),menu=node("div",undefined,"menu");

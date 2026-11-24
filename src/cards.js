@@ -106,6 +106,7 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
       } else {
         if (typeof ref.body !== "string" || ref.body.length > maxBody) throw Error("Invalid body.");
         card.body = ref.body;
+        if(move && ref.slack_mentions!==undefined)card.slack_mentions=ref.slack_mentions;
         for (const field of ["subject","from","to","cc","bcc"]) {
           if (!Object.hasOwn(ref,field)) continue;
           if (typeof ref[field]!=="string" || ref[field].length>1024) throw Error("Invalid message field.");
@@ -135,7 +136,7 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
       if(!ref.old_text || typeof ref.new_text!=="string" || at<0 || body.indexOf(ref.old_text,at+1)!==-1)
         throw Error("Text does not match exactly once in the current draft. Leave the original card in place.");
       body=body.slice(0,at)+ref.new_text+body.slice(at+ref.old_text.length);
-    } else if(!["subject","from","to","cc","bcc"].some(k=>Object.hasOwn(ref,k)))throw Error("No edit specified.");
+    } else if(!["subject","from","to","cc","bcc","slack_mentions"].some(k=>Object.hasOwn(ref,k)))throw Error("No edit specified.");
     return applyChange({...ref,action:"edit",revision:card.revision,body},true);
   }
   async function report(ref) {
