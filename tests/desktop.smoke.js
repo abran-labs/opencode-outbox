@@ -152,5 +152,16 @@ try {
   assert.equal(envelope.subject,"Edited subject");
   assert.equal(envelope.to,"fixture@example.test");
   assert.equal(envelope.cc,"cc@example.test");
+  const slackText="<@U012MAYA123>, check the invite. @Other is plain text.";
+  await mount({service:"Slack",to:"#playtests",body:slackText,slack_mentions:[{id:"U012MAYA123",name:"Maya"}],delivery:"recording.record"});
+  await page.getByLabel("Message body").waitFor({state:"attached"});
+  assert.equal(await page.locator(".editor mark").allTextContents().then(xs=>xs.join(",")),"@Maya");
+  await page.locator(".editor mark").click();
+  await page.getByLabel("Message body").fill(slackText+" Thanks!");
+  await page.getByLabel("Message body").blur();
+  assert.equal(await page.locator(".editor mark").innerText(),"@Maya");
+  await send.click();
+  await page.getByRole("button",{name:"Sending",exact:true}).waitFor();
+  assert.equal(JSON.parse(notices.at(-1).text.split("\n").at(-1)).body,slackText+" Thanks!");
   console.log("Chromium: edited copy, discard receipt and edited send handoff passed.");
 } finally {await browser.close();}
