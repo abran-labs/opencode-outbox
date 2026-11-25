@@ -208,7 +208,7 @@ function renderCard(ctx, session, id, position) {
     const service=card.service||"Message",mark=serviceIcon(service),title=agentTitles[mark]||service;
     const glyph=node("span",undefined,"glyph");glyph.append(icon(mark));
     if(!["draft","sending"].includes(card.state)){
-      const outcome={discarded:"Discarded",sent:"Sent",requested:"Delivery not confirmed",unconfirmed:"Delivery not confirmed",uncertain:"Delivery not confirmed",failed:"Not sent"};
+      const outcome={copied:"Copied",discarded:"Discarded",sent:"Sent",requested:"Delivery not confirmed",unconfirmed:"Delivery not confirmed",uncertain:"Delivery not confirmed",failed:"Not sent"};
       const receipt=node("div",undefined,"receipt"),text=node("span",undefined,"receipt-text");
       const meta=[outcome[card.state],display("to",card.to||"")].filter(Boolean).join(" · ");
       text.append(node("span",title,"receipt-label")," ",node("span",meta,"receipt-meta"));
@@ -320,11 +320,11 @@ function renderCard(ctx, session, id, position) {
           await ctx.system.copy(values.body);copy.replaceChildren(icon("check"));copy.setAttribute("aria-label","Copied");setCopyLabel("Copied");
           clearTimeout(feedback);feedback=setTimeout(()=>{copy.replaceChildren(icon("copy"));copy.setAttribute("aria-label","Copy message");setCopyLabel(copyHint());},1600);
           await commit("edit",values);
-        } else {await commit(action,values);draw();}
+        } else {if(action==="copy-close")await ctx.system.copy(values.body);await commit(action,values);draw();}
       }catch(e){error(e);}
       finally{busy=false;for(const el of [...Object.values(fields),discard,arrow,copy])el.disabled=false;enabled();primary.textContent=send?"Send":"Copy";primary.removeAttribute("aria-label");}
     }
-    enabled();primary.onclick=()=>act(send?"send":"copy");discard.onclick=()=>act("discard");copy.onclick=()=>act("copy");
+    enabled();primary.onclick=()=>act(send?"send":"copy-close");discard.onclick=()=>act("discard");copy.onclick=()=>act("copy");
     rewrite.onclick=async()=>{
       if(busy||card.state!=="draft")return;
       busy=true;clearTimeout(timer);clearTimeout(rewriteFeedback);status.textContent="";
