@@ -156,6 +156,9 @@ export function makeCards(storage, notify, findDelivery=async()=>undefined, find
           const {mode} = await view(card);
           await requestSend(k,card,"The user clicked Send");
           return {...card,mode};
+        } else if(ref.action==="copy-close"){
+          if(card.delivery)throw Error("Only copy-only drafts can close as copied.");
+          card.state="copied";removed=card.attachments||[];delete card.attachments;
         } else if (ref.action !== "edit") throw Error("Unknown action.");
       }
       const next = await view(card);

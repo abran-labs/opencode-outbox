@@ -109,11 +109,14 @@ try {
   assert.equal(await page.getByRole("textbox").inputValue(),"original + correction!");
   assert.equal(await page.locator(".oc-outbox:visible").count(),1);
   await page.getByRole("textbox").fill("edited copy");
-  await page.getByRole("button",{name:"Copy",exact:true}).click();
+  await page.getByRole("button",{name:"Copy message",exact:true}).click();
   await page.getByRole("button",{name:"Copied",exact:true}).waitFor();
+  assert.equal(await page.getByRole("textbox").inputValue(),"edited copy");
+  await page.getByRole("button",{name:"Copy",exact:true}).click();
+  await page.getByText("Support chat Copied",{exact:true}).waitFor({timeout:2000});
   assert.equal(await page.evaluate(()=>window.copied),"edited copy");
-  await page.getByRole("button",{name:"Discard"}).click();
-  await page.getByText("Support chat Discarded",{exact:true}).waitFor({timeout:2000});
+  assert.equal(await page.getByRole("textbox").count(),0);
+  assert.equal((await store.get(original)).state,"copied");
   const discord=await mount({body:"original",from:"Sender (@sender) (123456789012345678)",to:"Fixture (@fixture) (223456789012345678)",service:"Discord",delivery:"recording.record"});
   assert.equal(await page.getByLabel("From",{exact:true}).inputValue(),"Sender (@sender)");
   assert.equal(await page.getByLabel("To",{exact:true}).inputValue(),"Fixture (@fixture)");
